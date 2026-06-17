@@ -70,12 +70,12 @@ Zanzibar represents an ideal testing ground for several reasons:
 
 > **Note**: The Zanzibar showcase demonstrates how Wajibika Mazingira adapts to local environmental contexts while maintaining the core platform functionality.
 
-## Core Features
+## 🌴 Core Features
 
-### 1. AI Impact Assessment Generator
+### 📊 **AI Impact Assessment Generator**
 Generate professional environmental, social, health, climate, and **carbon sequestration** impact assessments. Features AI-powered report generation with real-time streaming and deep analysis mode.
 
-### 2. Carbon Dashboard
+### 🌱 **Carbon Dashboard**
 Track carbon sequestration projects with:
 - Project registration and management (reforestation, afforestation, conservation, agroforestry, soil carbon, blue carbon, renewable energy)
 - Carbon sequestration rate tracking (tCO₂e/ha/yr)
@@ -83,7 +83,7 @@ Track carbon sequestration projects with:
 - AI-powered carbon potential analysis
 - Real-time metrics (total sequestered, credits issued, area restored)
 
-### 3. Carbon Market
+### 💰 **Carbon Market**
 A decentralized carbon credit marketplace with:
 - Order book for buying and selling carbon credits
 - Automated order matching engine
@@ -92,7 +92,7 @@ A decentralized carbon credit marketplace with:
 - Credit listing, trading, and retirement
 - Project type filtering and market depth visualization
 
-### 4. Governance Portal
+### 🗳️ **Governance Portal**
 Community-driven governance for carbon credit management with:
 - Proposal creation and voting (Carbon Standards, Pricing, Project Approval, Parameter Changes, Funding)
 - Weighted voting power based on carbon projects (10 VP each) and credit ownership (1 VP each)
@@ -101,11 +101,98 @@ Community-driven governance for carbon credit management with:
 - AI-powered debate analysis for informed voting
 - Proposal categories with progress tracking
 
-### 5. Secure Evidence Locker
+### 🔐 **Secure Evidence Locker**
 Store reports and upload photographic evidence with AI-powered image analysis. Export assessments as PDF.
 
-### 6. AI Community Assistant
+### 🤖 **AI Community Assistant**
 Engage with "Mazingira Rafiki," a multi-mode AI assistant with voice-to-text, text-to-speech, and modes for fast, smart, grounded (web search), and maps-based queries.
+
+## 🎯 Key Capabilities
+
+| Feature | Description | Impact |
+|---------|-------------|--------|
+| **AI Impact Assessment** | Professional environmental analysis | Data-driven decision making |
+| **Carbon Dashboard** | Real-time project tracking | Transparency & accountability |
+| **Carbon Market** | Decentralized trading platform | Market-based solutions |
+| **Governance Portal** | Community decision making | Democratic carbon management |
+| **Evidence Locker** | Secure report storage | Audit trail & verification |
+| **AI Assistant** | Multi-mode conversational AI | Enhanced user experience |
+
+## 🌍 Regional Focus: Zanzibar Showcase
+
+The platform features a dedicated **Zanzibar showcase** highlighting East Africa's unique conservation initiatives:
+
+### 🌴 **Zanzibar-Specific Features**
+
+- **Blue Carbon Focus**: Specialized carbon accounting for marine ecosystems
+- **Cultural Integration**: Swahili language support and local context
+- **Community Governance**: Zanzibar-specific voting power calculations
+- **Showcase Mode**: Dedicated Zanzibar dashboard with regional metrics
+
+### 📊 **Zanzibar Impact Statistics**
+
+| Metric | Value | Project |
+|--------|-------|---------|
+| **Mangrove Coverage** | 20,000+ hectares | 🌴 Mangrove Conservation |
+| **Coral Reef Area** | 1,500+ km² | 🌊 Coral Reef Protection |
+| **Marine Species** | 350+ species | 🐠 Marine Biodiversity |
+| **Carbon Potential** | 500,000+ tCO₂/yr | 💚 Blue Carbon |
+
+## 🛠 Technology Stack
+
+- **Frontend**: React 19, TypeScript, Vite 8
+- **Styling**: Tailwind CSS 3.4
+- **AI**: Ollama (local) or OpenRouter (cloud) — no API key required for Ollama
+- **Storage**: Client-side localStorage
+- **Auth & Payments**: Pi Network SDK
+- **Deployment**: GitHub Pages
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js and npm
+- **Option A (Ollama — recommended, free, private):** Install [Ollama](https://ollama.ai) and pull a model:
+  ```bash
+  ollama pull deepseek-r1:8b
+  ```
+- **Option B (OpenRouter — free cloud tier):** Sign up at [openrouter.ai](https://openrouter.ai) and create a free API key.
+
+### Running Locally
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/WilliamMajanja/wajibika-mazingira.git
+    cd wajibika-mazingira
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+3.  **Run the development server:**
+    ```bash
+    npm run dev
+    ```
+4.  Open your browser and navigate to the local address provided (e.g., `http://localhost:5173`).
+5.  Click the **AI icon (✨)** in the header to configure your AI provider — choose Ollama (default, local) or OpenRouter (cloud).
+
+> **Note for Zanzibar Users**: When accessing the application, select **Swahili (sw)** from the language selector to experience the full Zanzibar showcase with local language support and regional context.
+
+## 💡 Zanzibar Quick Start
+
+For a focused Zanzibar experience:
+
+```bash
+# Navigate to Zanzibar showcase
+# The application automatically detects Zanzibar context based on your location
+# or language preference (Swahili)
+
+# Access Zanzibar-specific features:
+# - Blue carbon project tracking
+# - Zanzibar governance portal
+# - Local community chat (Mazingira Rafiki)
+# - Regional statistics dashboard
+```
 
 ---
 

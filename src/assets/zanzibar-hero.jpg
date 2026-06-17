@@ -1,0 +1,15 @@
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="heroGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1b5e20"/>
+      <stop offset="50%" style="stop-color:#2e7d32"/>
+      <stop offset="100%" style="stop-color:#4caf50"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#heroGradient)"/>
+  <text x="400" y="200" textAnchor="middle" fill="white" fontFamily="Arial, sans-serif" fontSize="40" fontWeight="bold">Zanzibar Conservation</text>
+  <text x="400" y="260" textAnchor="middle" fill="white" fontFamily="Arial, sans-serif" fontSize="24">East African Marine Paradise</text>
+  <circle cx="200" cy="150" r="60" stroke="white" strokeWidth="2" fill="none" opacity="0.6"/>
+  <circle cx="600" cy="450" r="80" stroke="white" strokeWidth="2" fill="none" opacity="0.6"/>
+  <path d="M100 500 Q 400 400 Q 700 500" stroke="white" strokeWidth="3" fill="none" opacity="0.8"/>
+</svg>

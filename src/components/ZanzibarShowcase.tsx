@@ -4,6 +4,13 @@ import { getShowcaseLocales } from '../config/eac';
 import { CarbonProjectType } from '../types';
 import { useI18n } from '../config/i18n';
 
+// Import Zanzibar showcase images
+import ZanzibarHero from '../assets/zanzibar-hero.jpg';
+import ZanzibarMangroves from '../assets/zanzibar-mangroves.jpg';
+import ZanzibarCoralReef from '../assets/zanzibar-coral-reef.jpg';
+import ZanzibarSeaweed from '../assets/zanzibar-seaweed.jpg';
+import ZanzibarSolar from '../assets/zanzibar-solar.jpg';
+
 const projectTypeIcons: Record<string, string> = {
   blue_carbon: '🌊',
   conservation: '🦁',
@@ -71,16 +78,16 @@ export const ZanzibarShowcase: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Hero Section */}
+      {/* Hero Section with Background Image */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-green-900 via-brand-green-800 to-blue-900 text-white">
-        <div className="absolute inset-0 opacity-10">
-          <svg viewBox="0 0 800 400" className="w-full h-full">
-            <path d="M0 200 Q 200 100 400 200 T 800 200" stroke="white" strokeWidth="2" fill="none" opacity="0.3"/>
-            <path d="M0 250 Q 200 150 400 250 T 800 250" stroke="white" strokeWidth="2" fill="none" opacity="0.2"/>
-            <circle cx="150" cy="150" r="60" stroke="white" strokeWidth="1" fill="none" opacity="0.1"/>
-            <circle cx="650" cy="200" r="80" stroke="white" strokeWidth="1" fill="none" opacity="0.1"/>
-          </svg>
+        <div className="absolute inset-0">
+          <img 
+            src={ZanzibarHero} 
+            alt="Zanzibar coastal landscape with mangroves" 
+            className="w-full h-full object-cover opacity-30"
+          />
         </div>
+        <div className="absolute inset-0 bg-black/40" />
         <div className="relative p-8 md:p-12">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-4xl">🇹🇿</span>
@@ -136,39 +143,56 @@ export const ZanzibarShowcase: React.FC = () => {
 
       {/* Featured Projects */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {showcaseProjects.map(project => (
-          <Card key={project.id}>
-            <div className="p-5">
-              <div className="flex items-start gap-3 mb-3">
-                <span className="text-3xl flex-shrink-0">{projectTypeIcons[project.type] || '🌍'}</span>
+        {showcaseProjects.map((project, index) => {
+          const projectImages = [
+            ZanzibarMangroves,
+            ZanzibarCoralReef,
+            ZanzibarSeaweed,
+            ZanzibarSolar,
+          ];
+          const image = projectImages[index];
+          
+          return (
+            <Card key={project.id}>
+              <div className="p-5">
+                <div className="relative mb-3">
+                  <img 
+                    src={image} 
+                    alt={`${project.name} - Zanzibar conservation project`} 
+                    className="w-full h-48 object-cover rounded-lg mb-3"
+                  />
+                  <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1">
+                    <span className="text-lg">{projectTypeIcons[project.type] || '🌍'}</span>
+                  </div>
+                </div>
                 <div>
                   <h3 className="font-bold text-slate-800">{project.name}</h3>
                   <p className="text-xs text-slate-500">{project.location}</p>
                 </div>
-              </div>
-              <p className="text-sm text-slate-600 mb-4">{project.description}</p>
-              <div className="grid grid-cols-3 gap-3 text-sm mb-3">
-                <div>
-                  <span className="text-xs text-slate-500">{t('carbon.project.area')}</span>
-                  <p className="font-semibold">{project.areaHectares.toLocaleString()} ha</p>
+                <p className="text-sm text-slate-600 mb-4">{project.description}</p>
+                <div className="grid grid-cols-3 gap-3 text-sm mb-3">
+                  <div>
+                    <span className="text-xs text-slate-500">{t('carbon.project.area')}</span>
+                    <p className="font-semibold">{project.areaHectares.toLocaleString()} ha</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500">{t('carbon.project.rate')}</span>
+                    <p className="font-semibold">{project.rate} tCO₂/ha/yr</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500">Type</span>
+                    <p className="font-semibold capitalize">{project.type.replace(/_/g, ' ')}</p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-xs text-slate-500">{t('carbon.project.rate')}</span>
-                  <p className="font-semibold">{project.rate} tCO₂/ha/yr</p>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500">Type</span>
-                  <p className="font-semibold capitalize">{project.type.replace(/_/g, ' ')}</p>
+                <div className="flex flex-wrap gap-1">
+                  {project.sdg.map(s => (
+                    <span key={s} className="px-2 py-0.5 text-xs bg-brand-green-100 text-brand-green-800 rounded-full">{s}</span>
+                  ))}
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1">
-                {project.sdg.map(s => (
-                  <span key={s} className="px-2 py-0.5 text-xs bg-brand-green-100 text-brand-green-800 rounded-full">{s}</span>
-                ))}
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
       {/* Call to Action */}

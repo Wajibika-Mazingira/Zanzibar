@@ -17,6 +17,96 @@
 
 > **Note:** This project is **not** affiliated with or related to Pi Network (the cryptocurrency). It is an independent project under the minima PiNet OS initiative by William Majanja.
 
+## 🌴 Zanzibar Showcase
+
+Wajibika Mazingira features a dedicated **Zanzibar showcase** highlighting the island archipelago's unique conservation projects and carbon sequestration potential. Zanzibar serves as a living laboratory for innovative environmental solutions that can be scaled across East Africa.
+
+### 🌊 Key Zanzibar Conservation Initiatives
+
+#### 1. **Mangrove Conservation** 🌱
+- **Location**: Unguja & Pemba Islands
+- **Focus**: Jozani Reserve and surrounding mangrove forests
+- **Impact**: 20,000+ hectares of mangrove forest protecting coastlines and sequestering carbon
+- **Community**: Local fishermen and women involved in mangrove restoration
+
+#### 2. **Coral Reef Protection** 🌊
+- **Location**: Coastal reefs around Zanzibar and Pemba
+- **Focus**: Biodiversity conservation and sustainable fisheries
+- **Coverage**: 1,500+ km² of coral reef ecosystems
+- **Species**: 350+ marine species protected
+
+#### 3. **Seaweed Farming** 🌿
+- **Location**: Coastal communities of Zanzibar
+- **Focus**: Women-led seaweed cultivation for blue carbon
+- **Benefits**: Income generation + carbon sequestration
+- **Scale**: Supporting hundreds of coastal families
+
+### 📊 Zanzibar Impact Statistics
+
+| Metric | Value |
+|--------|-------|
+| **Mangrove Coverage** | 20,000+ hectares |
+| **Coral Reef Area** | 1,500+ km² |
+| **Marine Species** | 350+ species |
+| **Carbon Potential** | 500,000+ tCO₂/yr |
+| **Projects Active** | 15+ ongoing initiatives |
+
+### 💡 Why Zanzibar?
+
+Zanzibar represents an ideal testing ground for several reasons:
+
+- **Rich Biodiversity**: Unique ecosystem with mangroves, reefs, and seagrass beds
+- **Community Engagement**: Strong tradition of environmental stewardship
+- **Climate Resilience**: Direct exposure to sea-level rise and climate impacts
+- **Economic Opportunity**: Sustainable blue economy potential
+- **Scalable Model**: Proven approach for other coastal regions
+
+### 🔧 Zanzibar-Specific Features
+
+- **Blue Carbon Focus**: Specialized carbon accounting for marine ecosystems
+- **Cultural Integration**: Swahili language support and local context
+- **Community Governance**: Zanzibar-specific voting power calculations
+- **Showcase Mode**: Dedicated Zanzibar dashboard with regional metrics
+
+> **Note**: The Zanzibar showcase demonstrates how Wajibika Mazingira adapts to local environmental contexts while maintaining the core platform functionality.
+
+## Core Features
+
+### 1. AI Impact Assessment Generator
+Generate professional environmental, social, health, climate, and **carbon sequestration** impact assessments. Features AI-powered report generation with real-time streaming and deep analysis mode.
+
+### 2. Carbon Dashboard
+Track carbon sequestration projects with:
+- Project registration and management (reforestation, afforestation, conservation, agroforestry, soil carbon, blue carbon, renewable energy)
+- Carbon sequestration rate tracking (tCO₂e/ha/yr)
+- Automated carbon credit issuance based on sequestration calculations
+- AI-powered carbon potential analysis
+- Real-time metrics (total sequestered, credits issued, area restored)
+
+### 3. Carbon Market
+A decentralized carbon credit marketplace with:
+- Order book for buying and selling carbon credits
+- Automated order matching engine
+- Real-time price discovery with historical charting
+- AI-powered market insights and price predictions
+- Credit listing, trading, and retirement
+- Project type filtering and market depth visualization
+
+### 4. Governance Portal
+Community-driven governance for carbon credit management with:
+- Proposal creation and voting (Carbon Standards, Pricing, Project Approval, Parameter Changes, Funding)
+- Weighted voting power based on carbon projects (10 VP each) and credit ownership (1 VP each)
+- Quorum-based decision making (20% participation required)
+- Automatic proposal execution when conditions are met
+- AI-powered debate analysis for informed voting
+- Proposal categories with progress tracking
+
+### 5. Secure Evidence Locker
+Store reports and upload photographic evidence with AI-powered image analysis. Export assessments as PDF.
+
+### 6. AI Community Assistant
+Engage with "Mazingira Rafiki," a multi-mode AI assistant with voice-to-text, text-to-speech, and modes for fast, smart, grounded (web search), and maps-based queries.
+
 ---
 
 ## Core Features

@@ -1,0 +1,15 @@
+{
+  "name": "Wajibika Mazingira",
+  "description": "An AI-powered environmental impact assessment generator, anonymous community forum, and evidence locker for Kenya. A minima PiNet OS project by William Majanja. Empowering communities to take charge of their environment.",
+  "author": "William Majanja",
+  "project": "minima PiNet OS",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ],
+  "pi_network": {
+    "app_id": "wajibika-mazingira",
+    "version": "2.0",
+    "sandbox": true
+  }
+}

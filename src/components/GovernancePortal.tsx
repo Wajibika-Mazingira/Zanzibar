@@ -274,7 +274,15 @@ export const GovernancePortal: React.FC = () => {
         messages: [{ role: 'user', text: prompt }],
         systemInstruction: withLanguage(GOVERNANCE_INSTRUCTION, language),
       });
-      await readStream(stream, chunk => setAiDebate(prev => (prev || '') + chunk));
+      let fullText = '';
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      await readStream(stream, chunk => {
+        fullText += chunk;
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => setAiDebate(fullText), 50);
+      });
+      if (timeoutId) clearTimeout(timeoutId);
+      setAiDebate(fullText);
     } catch {
       addToast({ type: 'error', message: 'Failed to get AI analysis.' });
     } finally {

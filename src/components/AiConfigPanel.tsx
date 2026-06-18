@@ -15,7 +15,7 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
 
   const handleSave = () => {
     updateConfig(local);
-    addToast({ type: 'success', message: `${t('aiConfig.toast.saved')}: ${local.type === 'ollama' ? t('aiConfig.ollama') : t('aiConfig.openrouter')}.` });
+    addToast({ type: 'success', message: `${t('aiConfig.toast.saved')}: ${local.type === 'ollama' ? t('aiConfig.ollama') : local.type === 'openrouter' ? t('aiConfig.openrouter') : t('aiConfig.qvac')}.` });
     onClose();
   };
 
@@ -25,12 +25,13 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     try {
       if (local.type === 'ollama') {
         const url = (local.ollamaUrl || defaultConfig.ollamaUrl || 'http://localhost:11434').replace(/\/+$/, '');
-        const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(5000) });
+        const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(3000) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         const models = (json.models || []).map((m: any) => m.name);
-        addToast({ type: 'success', message: `${t('aiConfig.toast.ollamaConnected')} Models: ${models.slice(0, 3).join(', ')}${models.length > 3 ? '...' : ''}` });
-      } else {
+        const llama3Available = models.some((m: string) => m.includes('llama3'));
+        addToast({ type: 'success', message: `${t('aiConfig.toast.ollamaConnected')} ${llama3Available ? 'llama3:latest available' : `Models: ${models.slice(0, 3).join(', ')}${models.length > 3 ? '...' : ''}` }` });
+      } else if (local.type === 'openrouter') {
         if (!local.openRouterKey) throw new Error(t('aiConfig.toast.noKey'));
         const res = await fetch('https://openrouter.ai/api/v1/auth/key', {
           headers: { Authorization: `Bearer ${local.openRouterKey}` },
@@ -39,6 +40,12 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         addToast({ type: 'success', message: `${t('aiConfig.toast.openrouterConnected')} Credits: ${json.data?.credits || 'N/A'}` });
+      } else {
+        const res = await fetch('http://localhost:11434/v1/models', {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        addToast({ type: 'success', message: `${t('aiConfig.toast.qvacConnected')} QVAC is running locally on port 11434` });
       }
       setTestResult('ok');
     } catch (e: any) {
@@ -72,6 +79,10 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
               <button onClick={() => setLocal({ ...local, type: 'openrouter' as AiProviderType })}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${local.type === 'openrouter' ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                 <span className="block text-lg mb-1">🌐</span>{t('aiConfig.openrouter')}
+              </button>
+              <button onClick={() => setLocal({ ...local, type: 'qvac' as AiProviderType })}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${local.type === 'qvac' ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                <span className="block text-lg mb-1">⚡</span>{t('aiConfig.qvac')}
               </button>
             </div>
 
@@ -116,6 +127,24 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     placeholder={t('aiConfig.modelPlaceholder.openrouter')}
                     className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
                   <p className="text-xs text-slate-400 mt-1">{t('aiConfig.modelHint.openrouter')}</p>
+                </div>
+              </div>
+            )}
+
+            {/* QVAC Settings */}
+            {local.type === 'qvac' && (
+              <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
+                <h3 className="font-semibold text-sm text-slate-700">{t('aiConfig.qvacSettings')}</h3>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('aiConfig.model')}</label>
+                  <input type="text" value={local.qvacModel || defaultConfig.qvacModel}
+                    onChange={e => setLocal({ ...local, qvacModel: e.target.value })}
+                    placeholder={t('aiConfig.modelPlaceholder.qvac')}
+                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                  <p className="text-xs text-slate-400 mt-1">{t('aiConfig.modelHint.qvac')}</p>
+                </div>
+                <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded">
+                  <strong>Note:</strong> QVAC is a local-first, peer-to-peer AI platform. It runs locally on your machine and doesn't require API keys. Ensure QVAC is running locally on port 11434. Visit <a href="https://docs.qvac.tether.io" target="_blank" rel="noopener noreferrer" className="text-brand-green-600 hover:underline">docs.qvac.tether.io</a> for setup instructions.
                 </div>
               </div>
             )}

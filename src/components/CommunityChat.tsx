@@ -5,10 +5,15 @@ import { useToasts } from '../hooks/useToasts';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useStreamReader } from '../hooks/useStreamReader';
 import { streamAIResponse, speakText } from '../services/aiClient';
-import { CHAT_DEFAULT_SYSTEM_INSTRUCTION, withLanguage } from '../config/ai';
+import type { ChatMode } from '../services/aiClient';
+import {
+  CHAT_DEFAULT_SYSTEM_INSTRUCTION,
+  CHAT_FAST_SYSTEM_INSTRUCTION,
+  CHAT_GROUNDED_SYSTEM_INSTRUCTION,
+  CHAT_MAPS_SYSTEM_INSTRUCTION,
+  withLanguage,
+} from '../config/ai';
 import { useI18n } from '../config/i18n';
-
-type ChatMode = 'fast' | 'smart' | 'grounded' | 'maps';
 
 interface Message {
     id: string;
@@ -79,13 +84,24 @@ export const CommunityChat: React.FC = () => {
         setIsLoading(true);
 
         try {
-            const baseSystem = (chatMode === 'grounded' || chatMode === 'maps')
-              ? CHAT_DEFAULT_SYSTEM_INSTRUCTION + " When relevant, include up-to-date information. For Maps mode, consider location-based context."
-              : CHAT_DEFAULT_SYSTEM_INSTRUCTION;
+            let baseSystem: string;
+            switch (chatMode) {
+              case 'fast':
+                baseSystem = CHAT_FAST_SYSTEM_INSTRUCTION;
+                break;
+              case 'grounded':
+                baseSystem = CHAT_GROUNDED_SYSTEM_INSTRUCTION;
+                break;
+              case 'maps':
+                baseSystem = CHAT_MAPS_SYSTEM_INSTRUCTION;
+                break;
+              default:
+                baseSystem = CHAT_DEFAULT_SYSTEM_INSTRUCTION;
+            }
             const systemMsg = withLanguage(baseSystem, language);
 
             const contextMsg = chatMode === 'maps' && userLocation
-              ? `(The user is near ${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}. Consider location-based information.)`
+              ? `(The user is near ${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}. Consider local environmental conditions, vegetation, climate, and relevant community projects in this area.)`
               : '';
 
             const contextMessages = contextMsg
@@ -98,15 +114,36 @@ export const CommunityChat: React.FC = () => {
             const stream = await streamAIResponse('chat', {
                 messages: contextMessages,
                 systemInstruction: systemMsg,
+                mode: chatMode,
             });
 
+            let fullText = '';
+            let timeoutId: ReturnType<typeof setTimeout> | null = null;
+            
             await readStream(stream, (chunk) => {
-                setMessages(prev => {
-                    const next = [...prev];
-                    const last = next[next.length - 1];
-                    if (last.role === 'model') last.text += chunk;
-                    return next;
-                });
+                fullText += chunk;
+                
+                if (timeoutId) clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    setMessages(prev => {
+                        const next = [...prev];
+                        const last = next[next.length - 1];
+                        if (last.role === 'model') {
+                            last.text = fullText;
+                        }
+                        return next;
+                    });
+                }, 50);
+            });
+            
+            if (timeoutId) clearTimeout(timeoutId);
+            setMessages(prev => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last.role === 'model') {
+                    last.text = fullText;
+                }
+                return next;
             });
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : 'An unknown error occurred.';

@@ -1,5 +1,14 @@
 import { getProvider } from '../contexts/AiProviderContext';
-import type { AiMessage } from './aiProvider';
+import type { AiMessage, AiStreamOptions } from './aiProvider';
+
+export type ChatMode = 'fast' | 'smart' | 'grounded' | 'maps';
+
+const MODE_STREAM_OPTIONS: Record<ChatMode, AiStreamOptions> = {
+  fast: { numPredict: 128, temperature: 0.5 },
+  smart: { numPredict: 256, temperature: 0.3 },
+  grounded: { numPredict: 256, temperature: 0.3 },
+  maps: { numPredict: 256, temperature: 0.3 },
+};
 
 export const streamAIResponse = async (
   task: string,
@@ -10,11 +19,13 @@ export const streamAIResponse = async (
   switch (task) {
     case 'chat':
     case 'complexGeneration': {
-      const { messages, model, systemInstruction } = payload;
+      const { messages, model, systemInstruction, mode } = payload;
+      const options = mode ? MODE_STREAM_OPTIONS[mode as ChatMode] : undefined;
       return provider.streamChat(
         messages as AiMessage[],
         systemInstruction as string | undefined,
         model as string | undefined,
+        options,
       );
     }
     case 'analyzeImage': {

@@ -203,7 +203,15 @@ export const CarbonMarket: React.FC = () => {
         messages: [{ role: 'user', text: prompt }],
         systemInstruction: withLanguage(CARBON_EXPERT_INSTRUCTION, language),
       });
-      await readStream(stream, chunk => setAiInsight(prev => (prev || '') + chunk));
+      let fullText = '';
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      await readStream(stream, chunk => {
+        fullText += chunk;
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => setAiInsight(fullText), 50);
+      });
+      if (timeoutId) clearTimeout(timeoutId);
+      setAiInsight(fullText);
     } catch {
       addToast({ type: 'error', message: 'Failed to get market insight.' });
     } finally {

@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock AiProviderContext
+const mockStreamChat = vi.fn();
+const mockStreamImageAnalysis = vi.fn();
+const mockGenerateChat = vi.fn();
+
 vi.mock('../contexts/AiProviderContext', () => {
   const mockProvider = {
-    streamChat: vi.fn(),
-    streamImageAnalysis: vi.fn(),
-    generateChat: vi.fn(),
+    streamChat: mockStreamChat,
+    streamImageAnalysis: mockStreamImageAnalysis,
+    generateChat: mockGenerateChat,
   };
   return {
     getProvider: vi.fn(() => mockProvider),
@@ -31,14 +35,13 @@ describe('aiClient', () => {
     });
 
     it('returns a ReadableStream for chat task', async () => {
-      const mockProvider = (await import('../contexts/AiProviderContext')).getProvider();
       const mockStream = new ReadableStream<Uint8Array>({
         start(controller) {
           controller.enqueue(new TextEncoder().encode('Hello World'));
           controller.close();
         },
       });
-      mockProvider.streamChat.mockResolvedValue(mockStream);
+      mockStreamChat.mockResolvedValue(mockStream);
 
       const { streamAIResponse } = await import('../services/aiClient');
       const stream = await streamAIResponse('chat', {
@@ -58,22 +61,21 @@ describe('aiClient', () => {
     });
 
     it('forwards complexGeneration task to provider streamChat', async () => {
-      const mockProvider = (await import('../contexts/AiProviderContext')).getProvider();
       const { streamAIResponse } = await import('../services/aiClient');
       await streamAIResponse('complexGeneration', {
         messages: [{ role: 'user', text: 'test' }],
         systemInstruction: 'Be helpful',
         model: 'custom-model',
       });
-      expect(mockProvider.streamChat).toHaveBeenCalledWith(
+      expect(mockStreamChat).toHaveBeenCalledWith(
         [{ role: 'user', text: 'test' }],
         'Be helpful',
         'custom-model',
+        undefined,
       );
     });
 
     it('forwards analyzeImage task to provider streamImageAnalysis', async () => {
-      const mockProvider = (await import('../contexts/AiProviderContext')).getProvider();
       const { streamAIResponse } = await import('../services/aiClient');
       await streamAIResponse('analyzeImage', {
         prompt: 'What is this?',
@@ -81,7 +83,7 @@ describe('aiClient', () => {
         mimeType: 'image/jpeg',
         model: 'vision-model',
       });
-      expect(mockProvider.streamImageAnalysis).toHaveBeenCalledWith({
+      expect(mockStreamImageAnalysis).toHaveBeenCalledWith({
         prompt: 'What is this?',
         image: 'base64data',
         mimeType: 'image/jpeg',
@@ -97,8 +99,7 @@ describe('aiClient', () => {
     });
 
     it('returns text from provider generateChat', async () => {
-      const mockProvider = (await import('../contexts/AiProviderContext')).getProvider();
-      mockProvider.generateChat.mockResolvedValue({ text: 'Response text' });
+      mockGenerateChat.mockResolvedValue({ text: 'Response text' });
 
       const { generateAIResponse } = await import('../services/aiClient');
       const result = await generateAIResponse('chat', {

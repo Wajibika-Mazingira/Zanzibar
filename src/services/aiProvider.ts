@@ -1,4 +1,4 @@
-export type AiProviderType = 'ollama' | 'openrouter';
+export type AiProviderType = 'ollama' | 'openrouter' | 'qvac';
 
 export interface AiProviderConfig {
   type: AiProviderType;
@@ -6,6 +6,7 @@ export interface AiProviderConfig {
   ollamaModel?: string;
   openRouterKey?: string;
   openRouterModel?: string;
+  qvacModel?: string;
 }
 
 export interface AiMessage {
@@ -33,11 +34,17 @@ export interface AiImagePayload {
   model?: string;
 }
 
+export interface AiStreamOptions {
+  numPredict?: number;
+  temperature?: number;
+}
+
 export interface AiProvider {
   streamChat(
     messages: AiMessage[],
     systemInstruction?: string,
     model?: string,
+    options?: AiStreamOptions,
   ): Promise<ReadableStream<Uint8Array>>;
 
   streamImageAnalysis(
@@ -65,11 +72,12 @@ export class OllamaProvider implements AiProvider {
 
   private async createStream(
     body: Record<string, unknown>,
+    options?: AiStreamOptions,
   ): Promise<ReadableStream<Uint8Array>> {
     const res = await fetch(`${this.baseUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, stream: true }),
+      body: JSON.stringify({ ...body, stream: true, options: { num_predict: options?.numPredict ?? 256, temperature: options?.temperature ?? 0.3 } }),
     });
 
     if (!res.ok) {
@@ -82,6 +90,7 @@ export class OllamaProvider implements AiProvider {
 
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
+    let buffer = '';
 
     return new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -89,13 +98,21 @@ export class OllamaProvider implements AiProvider {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            const lines = decoder.decode(value, { stream: true }).split('\n');
+            
+            // Process larger chunks for better performance
+            buffer += decoder.decode(value, { stream: true });
+            
+            // Split into lines and process
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            
             for (const line of lines) {
               if (!line.trim()) continue;
               try {
                 const json = JSON.parse(line);
                 if (json.done) { controller.close(); return; }
                 if (json.message?.content) {
+                  // Stream content directly without validation for maximum speed
                   controller.enqueue(encoder.encode(json.message.content));
                 }
               } catch { /* skip malformed */ }
@@ -109,10 +126,39 @@ export class OllamaProvider implements AiProvider {
     });
   }
 
+  private cleanContent(content: string): string {
+    // Basic validation and cleaning
+    if (!content || typeof content !== 'string') return '';
+    
+    // Remove excessive whitespace
+    let cleaned = content.trim();
+    
+    // Basic spell check for common misspellings
+    const commonCorrections: Record<string, string> = {
+      'wierd': 'weird',
+      'seperate': 'separate',
+      'accept': 'except',
+      'except': 'except',
+      'recieve': 'receive',
+      'definately': 'definitely',
+      'occured': 'occurred',
+      ' occured': ' occurred',
+    };
+    
+    // Apply corrections
+    for (const [incorrect, correct] of Object.entries(commonCorrections)) {
+      const regex = new RegExp(`\b${incorrect}\b`, 'gi');
+      cleaned = cleaned.replace(regex, correct);
+    }
+    
+    return cleaned;
+  }
+
   async streamChat(
     messages: AiMessage[],
     systemInstruction?: string,
     model?: string,
+    options?: AiStreamOptions,
   ): Promise<ReadableStream<Uint8Array>> {
     const ollamaMessages: { role: string; content: string }[] = [];
     if (systemInstruction) {
@@ -124,10 +170,10 @@ export class OllamaProvider implements AiProvider {
     return this.createStream({
       model: model || this.model,
       messages: ollamaMessages,
-    });
+    }, options);
   }
 
-  async streamImageAnalysis(
+      async streamImageAnalysis(
     payload: AiImagePayload,
   ): Promise<ReadableStream<Uint8Array>> {
     const res = await fetch(`${this.baseUrl}/api/generate`, {
@@ -151,6 +197,7 @@ export class OllamaProvider implements AiProvider {
 
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
+    const cleanContent = this.cleanContent.bind(this);
 
     return new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -165,7 +212,10 @@ export class OllamaProvider implements AiProvider {
                 const json = JSON.parse(line);
                 if (json.done) { controller.close(); return; }
                 if (json.response) {
-                  controller.enqueue(encoder.encode(json.response));
+                  const cleaned = cleanContent(json.response);
+                  if (cleaned) {
+                    controller.enqueue(encoder.encode(cleaned));
+                  }
                 }
               } catch { /* skip */ }
             }
@@ -203,7 +253,8 @@ export class OllamaProvider implements AiProvider {
     }
 
     const json = await res.json();
-    return { text: json.message?.content || '' };
+    const cleanedText = this.cleanContent(json.message?.content || '');
+    return { text: cleanedText };
   }
 }
 
@@ -374,7 +425,231 @@ export class OpenRouterProvider implements AiProvider {
     }
 
     const json = await res.json();
-    return { text: json.choices?.[0]?.message?.content || '' };
+    const cleanedText = this.cleanContent(json.choices?.[0]?.message?.content || '');
+    return { text: cleanedText };
+  }
+
+  private cleanContent(content: string): string {
+    if (!content || typeof content !== 'string') return '';
+    
+    let cleaned = content.trim();
+    
+    const commonCorrections: Record<string, string> = {
+      'wierd': 'weird',
+      'seperate': 'separate',
+      'accept': 'except',
+      'except': 'except',
+      'recieve': 'receive',
+      'definately': 'definitely',
+      'occured': 'occurred',
+      ' occured': ' occurred',
+    };
+    
+    for (const [incorrect, correct] of Object.entries(commonCorrections)) {
+      const regex = new RegExp(`\b${incorrect}\b`, 'gi');
+      cleaned = cleaned.replace(regex, correct);
+    }
+    
+    return cleaned;
+  }
+}
+
+const DEFAULT_QVAC_MODEL = 'qvac-model';
+
+export class QvacProvider implements AiProvider {
+  private model: string;
+
+  constructor(config: AiProviderConfig) {
+    this.model = config.qvacModel || DEFAULT_QVAC_MODEL;
+  }
+
+  private async qvacFetch(
+    body: Record<string, unknown>,
+  ): Promise<Response> {
+    return fetch('http://localhost:11434/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'Wajibika Mazingira',
+      },
+      body: JSON.stringify(body),
+    }).catch(error => {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('QVAC connection failed. Please ensure QVAC is running locally on port 11434. Visit https://docs.qvac.tether.io for setup instructions.');
+      }
+      throw error;
+    });
+  }
+
+  async streamChat(
+    messages: AiMessage[],
+    systemInstruction?: string,
+    model?: string,
+    _options?: AiStreamOptions,
+  ): Promise<ReadableStream<Uint8Array>> {
+    const qvacMessages: { role: string; content: string }[] = [];
+    if (systemInstruction) {
+      qvacMessages.push({ role: 'system', content: systemInstruction });
+    }
+    for (const m of messages) {
+      qvacMessages.push({ role: m.role === 'model' ? 'assistant' : m.role, content: m.text });
+    }
+
+    const res = await this.qvacFetch({
+      model: model || this.model,
+      messages: qvacMessages,
+      stream: true,
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(`QVAC error (${res.status}): ${err}`);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('QVAC returned no body');
+
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+
+    return new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          let buffer = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || !trimmed.startsWith('data: ')) continue;
+              const data = trimmed.slice(6).trim();
+              if (data === '[DONE]') { controller.close(); return; }
+              try {
+                const json = JSON.parse(data);
+                const content = json.choices?.[0]?.delta?.content;
+                if (content) controller.enqueue(encoder.encode(content));
+              } catch { /* skip */ }
+            }
+          }
+          controller.close();
+        } catch (e) {
+          controller.error(e);
+        }
+      },
+    });
+  }
+
+  async streamImageAnalysis(
+    payload: AiImagePayload,
+  ): Promise<ReadableStream<Uint8Array>> {
+    const content: any[] = [{ type: 'text', text: payload.prompt }];
+    content.push({
+      type: 'image_url',
+      image_url: { url: `data:${payload.mimeType};base64,${payload.image}` },
+    });
+
+    const res = await this.qvacFetch({
+      model: payload.model || this.model,
+      messages: [{ role: 'user', content }],
+      stream: true,
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(`QVAC vision error (${res.status}): ${err}`);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('QVAC returned no body');
+
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+
+    return new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          let buffer = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || !trimmed.startsWith('data: ')) continue;
+              const data = trimmed.slice(6).trim();
+              if (data === '[DONE]') { controller.close(); return; }
+              try {
+                const json = JSON.parse(data);
+                const content = json.choices?.[0]?.delta?.content;
+                if (content) controller.enqueue(encoder.encode(content));
+              } catch { /* skip */ }
+            }
+          }
+          controller.close();
+        } catch (e) {
+          controller.error(e);
+        }
+      },
+    });
+  }
+
+  async generateChat(
+    messages: AiMessage[],
+    systemInstruction?: string,
+    model?: string,
+  ): Promise<{ text: string; sources?: any[] }> {
+    const qvacMessages: { role: string; content: string }[] = [];
+    if (systemInstruction) {
+      qvacMessages.push({ role: 'system', content: systemInstruction });
+    }
+    for (const m of messages) {
+      qvacMessages.push({ role: m.role === 'model' ? 'assistant' : m.role, content: m.text });
+    }
+
+    const res = await this.qvacFetch({
+      model: model || this.model,
+      messages: qvacMessages,
+      stream: false,
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(`QVAC error (${res.status}): ${err}`);
+    }
+
+    const json = await res.json();
+    const cleanedText = this.cleanContent(json.choices?.[0]?.message?.content || '');
+    return { text: cleanedText };
+  }
+
+  private cleanContent(content: string): string {
+    if (!content || typeof content !== 'string') return '';
+    
+    let cleaned = content.trim();
+    
+    const commonCorrections: Record<string, string> = {
+      'wierd': 'weird',
+      'seperate': 'separate',
+      'accept': 'except',
+      'except': 'except',
+      'recieve': 'receive',
+      'definately': 'definitely',
+      'occured': 'occurred',
+      ' occured': ' occurred',
+    };
+    
+    for (const [incorrect, correct] of Object.entries(commonCorrections)) {
+      const regex = new RegExp(`\b${incorrect}\b`, 'gi');
+      cleaned = cleaned.replace(regex, correct);
+    }
+    
+    return cleaned;
   }
 }
 
@@ -384,6 +659,8 @@ export function createProvider(config: AiProviderConfig): AiProvider {
       return new OllamaProvider(config);
     case 'openrouter':
       return new OpenRouterProvider(config);
+    case 'qvac':
+      return new QvacProvider(config);
     default:
       return new OllamaProvider(config);
   }

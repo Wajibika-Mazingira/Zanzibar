@@ -8,6 +8,7 @@ import { useI18n } from '../config/i18n';
 const EvidenceReportViewer = React.lazy(() => import('./EvidenceReportViewer'));
 const EvidenceListPanel = React.lazy(() => import('./EvidenceListPanel').then(m => ({ default: m.default })));
 import { useToasts } from '../hooks/useToasts';
+import { useStreamReader } from '../hooks/useStreamReader';
 // exportToPdf, streamAIResponse and PiPaymentButton are lazy-loaded to reduce initial bundle
 import { MODELS } from '../config/ai';
 import { MAX_IMAGE_SIZE_BYTES, MAX_IMAGE_SIZE_LABEL } from '../utils/sanitize';
@@ -23,6 +24,7 @@ export const EvidenceLocker: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'environmental' | 'social' | 'health' | 'climate' | 'carbon' | 'monitoring' | 'engagement' | 'compliance' | 'financial' | 'risk'>('all');
   const { addToast } = useToasts();
   const { t, language } = useI18n();
+  const { readStream } = useStreamReader();
   
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -112,23 +114,27 @@ export const EvidenceLocker: React.FC = () => {
               model: MODELS.flash
           });
          
-         const reader = stream.getReader();
-         const decoder = new TextDecoder();
-         while(true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            const currentAssessment = assessments.find(a => a.id === selectedAssessment.id);
-            const currentEvidence = currentAssessment?.evidence?.find(e => e.id === evidenceId);
-            const updatedAnalysis = (currentEvidence?.analysis || '') + chunk;
-            
-            const newAssessments = assessments.map(a => a.id === selectedAssessment.id ? {
-                ...a,
-                evidence: a.evidence?.map(e => e.id === evidenceId ? {...e, analysis: updatedAnalysis} : e)
-            } : a);
-            setAssessments(newAssessments);
-            setSelectedAssessment(newAssessments.find(a => a.id === selectedAssessment.id) || null);
-         }
+         let fullText = '';
+         let timeoutId: ReturnType<typeof setTimeout> | null = null;
+         await readStream(stream, chunk => {
+             fullText += chunk;
+             if (timeoutId) clearTimeout(timeoutId);
+             timeoutId = setTimeout(() => {
+                 const newAssessments = assessments.map(a => a.id === selectedAssessment.id ? {
+                     ...a,
+                     evidence: a.evidence?.map(e => e.id === evidenceId ? {...e, analysis: fullText} : e)
+                 } : a);
+                 setAssessments(newAssessments);
+                 setSelectedAssessment(newAssessments.find(a => a.id === selectedAssessment.id) || null);
+             }, 50);
+         });
+         if (timeoutId) clearTimeout(timeoutId);
+         const finalAssessments = assessments.map(a => a.id === selectedAssessment.id ? {
+             ...a,
+             evidence: a.evidence?.map(e => e.id === evidenceId ? {...e, analysis: fullText} : e)
+         } : a);
+         setAssessments(finalAssessments);
+         setSelectedAssessment(finalAssessments.find(a => a.id === selectedAssessment.id) || null);
      } catch (error) {
          addToast({ type: 'error', message: 'Image analysis failed.' });
          updateEvidenceState(evidenceId, { analysis: 'Error during analysis.' });

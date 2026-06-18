@@ -167,7 +167,15 @@ export const CarbonDashboard: React.FC = () => {
         messages: [{ role: 'user', text: `Analyze the carbon sequestration potential of this conservation project:\nName: ${project.name}\nLocation: ${project.location}\nType: ${project.projectType}\nArea: ${project.areaHectares} ha\nSequestration Rate: ${project.carbonSequestrationRate} tCO2e/ha/yr\nMethodology: ${project.methodology || 'Not specified'}\nStatus: ${project.status}\n\nProvide: 1. Estimated potential over 10 and 30 years 2. Recommended standards (VCS, Gold Standard, Plan Vivo) 3. Risk assessment (leakage, permanence, additionality) 4. MRV recommendations 5. Estimated credit value at market prices` }],
         systemInstruction: withLanguage(CARBON_EXPERT_INSTRUCTION, language),
       });
-      await readStream(stream, chunk => setAiAnalysis(prev => (prev || '') + chunk));
+      let fullText = '';
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      await readStream(stream, chunk => {
+        fullText += chunk;
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => setAiAnalysis(fullText), 50);
+      });
+      if (timeoutId) clearTimeout(timeoutId);
+      setAiAnalysis(fullText);
     } catch {
       addToast({ type: 'error', message: 'AI analysis failed.' });
     } finally {

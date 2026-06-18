@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Card } from './common/Card';
+import { ConfirmDialog } from './common/ConfirmDialog';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToasts } from '../hooks/useToasts';
 import { useI18n } from '../config/i18n';
@@ -123,6 +124,8 @@ export const CarbonPassportComponent: React.FC = () => {
   const [passports, setPassports] = useLocalStorage<CarbonPassport[]>('carbonPassports', []);
   const [activePassportId, setActivePassportId] = React.useState<string | null>(null);
   const [showDeviceDetail, setShowDeviceDetail] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
+  const [sensorFilter, setSensorFilter] = React.useState<SensorType | 'all'>('all');
   const { addToast } = useToasts();
   const { t, language } = useI18n();
 
@@ -131,20 +134,70 @@ export const CarbonPassportComponent: React.FC = () => {
     return passports[0] || null;
   }, [passports, activePassportId]);
 
+  const filteredObservations = React.useMemo(() => {
+    if (!passport) return [];
+    if (sensorFilter === 'all') return passport.observations;
+    return passport.observations.filter(o => o.sensorType === sensorFilter);
+  }, [passport, sensorFilter]);
+
   const handleCreatePassport = () => {
+    if (projects.length === 0) {
+      addToast({ type: 'error', message: t('passport.noProjects') });
+      return;
+    }
     const mock = generateMockPassport(projects);
     if (!mock) {
-      addToast({ type: 'error', message: language === 'sw' ? 'Sajili mradi kwanza.' : 'Register a carbon project first.' });
+      addToast({ type: 'error', message: t('passport.noProjects') });
       return;
     }
     const exists = passports.some(p => p.projectId === mock.projectId);
     if (exists) {
-      addToast({ type: 'info', message: language === 'sw' ? 'Pasipoti ipo tayari.' : 'Passport already exists for this project.' });
+      addToast({ type: 'info', message: t('passport.projectHasPassport') });
       return;
     }
     setPassports([mock, ...passports]);
     setActivePassportId(mock.id);
     addToast({ type: 'success', message: language === 'sw' ? 'Pasipoti ya kaboni imeundwa.' : 'Carbon Passport created.' });
+  };
+
+  const handleDeletePassport = () => {
+    if (!deleteTarget) return;
+    const updated = passports.filter(p => p.id !== deleteTarget);
+    setPassports(updated);
+    if (activePassportId === deleteTarget) {
+      setActivePassportId(updated[0]?.id || null);
+    }
+    setDeleteTarget(null);
+    addToast({ type: 'info', message: t('passport.delete.success') });
+  };
+
+  const handleStatusChange = (newStatus: 'active' | 'pending' | 'archived') => {
+    if (!passport) return;
+    const updated = passports.map(p =>
+      p.id === passport.id ? { ...p, status: newStatus, lastUpdated: new Date().toISOString() } : p
+    );
+    setPassports(updated);
+    addToast({ type: 'success', message: t('passport.statusChanged') });
+  };
+
+  const handleRefreshObservations = () => {
+    if (!passport) return;
+    const newObservations = Array.from({ length: 12 }, (_, i) => ({
+      id: `obs-${Date.now()}-${i}`,
+      deviceId: passport.device.id,
+      sensorType: ['acoustic', 'visual', 'salinity', 'water_level', 'biomass', 'weather'][i % 6] as SensorType,
+      timestamp: new Date(Date.now() - (11 - i) * 3600000).toISOString(),
+      value: Math.round((20 + Math.random() * 80) * 100) / 100,
+      unit: sensorLabels[['acoustic', 'visual', 'salinity', 'water_level', 'biomass', 'weather'][i % 6] as SensorType].unit,
+      signature: `sig_${Date.now().toString(36)}_${i}`,
+      minAnchoredAt: new Date(Date.now() - (11 - i) * 3600000 + 5000).toISOString(),
+      minTxId: `tx_${Date.now().toString(36)}_${i}`,
+    }));
+    const updated = passports.map(p =>
+      p.id === passport.id ? { ...p, observations: newObservations, lastUpdated: new Date().toISOString() } : p
+    );
+    setPassports(updated);
+    addToast({ type: 'success', message: t('passport.refresh.success') });
   };
 
   const handleExportPassport = () => {
@@ -184,13 +237,42 @@ export const CarbonPassportComponent: React.FC = () => {
             {t('passport.create')}
           </button>
           {passport && (
-            <button onClick={handleExportPassport}
-              className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400">
-              {t('passport.export')}
-            </button>
+            <>
+              <button onClick={handleRefreshObservations}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                {t('passport.refresh')}
+              </button>
+              <button onClick={handleExportPassport}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                {t('passport.export')}
+              </button>
+              <button onClick={() => setDeleteTarget(passport.id)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-400">
+                {t('passport.delete')}
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Passport Selector */}
+      {passports.length > 1 && (
+        <Card>
+          <div className="p-3">
+            <label className="block text-xs font-semibold text-slate-500 mb-2">{t('passport.selectPassport')}</label>
+            <div className="flex flex-wrap gap-2">
+              {passports.map(p => (
+                <button key={p.id} onClick={() => { setActivePassportId(p.id); setSensorFilter('all'); }}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green-500 ${
+                    passport?.id === p.id ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}>
+                  {p.projectName}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {!passport ? (
         <Card>
@@ -211,7 +293,21 @@ export const CarbonPassportComponent: React.FC = () => {
                 <h3 className="text-lg font-bold text-slate-800">{passport.projectName}</h3>
                 <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusColor[passport.status]}`}>{passport.status}</span>
               </div>
-              <span className="text-xs text-slate-400">{t('passport.updated')}: {new Date(passport.lastUpdated).toLocaleDateString()}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">{t('passport.updated')}: {new Date(passport.lastUpdated).toLocaleDateString()}</span>
+                <div className="relative">
+                  <select
+                    value={passport.status}
+                    onChange={(e) => handleStatusChange(e.target.value as 'active' | 'pending' | 'archived')}
+                    className="text-xs font-semibold rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-green-500"
+                    aria-label={t('passport.changeStatus')}
+                  >
+                    <option value="active">{t('passport.status.active')}</option>
+                    <option value="pending">{t('passport.status.pending')}</option>
+                    <option value="archived">{t('passport.status.archived')}</option>
+                  </select>
+                </div>
+              </div>
             </div>
             <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -226,6 +322,24 @@ export const CarbonPassportComponent: React.FC = () => {
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">{t('passport.created')}</p>
                 <p className="font-semibold text-slate-700">{new Date(passport.createdAt).toLocaleDateString()}</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Boundary Coordinates */}
+          <Card>
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="font-bold text-slate-800">{t('passport.boundary.title')}</h3>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {passport.boundary.map((point, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <span className="w-6 h-6 flex items-center justify-center bg-brand-green-100 text-brand-green-700 rounded-full text-xs font-bold">{i + 1}</span>
+                    <span className="text-slate-600">{t('passport.boundary.point')} {i + 1}:</span>
+                    <span className="font-mono text-xs text-slate-700">{point.latitude.toFixed(4)}, {point.longitude.toFixed(4)}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </Card>
@@ -287,12 +401,33 @@ export const CarbonPassportComponent: React.FC = () => {
 
           {/* Observations */}
           <Card>
-            <div className="p-4 border-b border-slate-200">
-              <h3 className="font-bold text-slate-800">{t('passport.observations')}</h3>
-              <p className="text-xs text-slate-500">{passport.observations.length} {t('passport.signedReadings')}</p>
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-slate-800">{t('passport.observations')}</h3>
+                <p className="text-xs text-slate-500">{filteredObservations.length} {t('passport.signedReadings')}</p>
+              </div>
+              <div className="flex gap-1 flex-wrap">
+                <button
+                  onClick={() => setSensorFilter('all')}
+                  className={`px-2 py-1 text-xs rounded-full font-semibold transition-colors ${
+                    sensorFilter === 'all' ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}>
+                  {t('passport.filter.all')}
+                </button>
+                {passport.device.sensors.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setSensorFilter(s)}
+                    className={`px-2 py-1 text-xs rounded-full font-semibold transition-colors ${
+                      sensorFilter === s ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}>
+                    {sensorLabels[s].icon} {sensorLabels[s].label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
-              {passport.observations.slice().reverse().map(obs => {
+              {filteredObservations.slice().reverse().map(obs => {
                 const info = sensorLabels[obs.sensorType];
                 return (
                   <div key={obs.id} className="p-3 flex justify-between items-center hover:bg-slate-50">
@@ -419,6 +554,17 @@ export const CarbonPassportComponent: React.FC = () => {
           </Card>
         </>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={t('passport.delete.title')}
+        message={t('passport.delete.message')}
+        confirmLabel={t('common.delete')}
+        variant="danger"
+        onConfirm={handleDeletePassport}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

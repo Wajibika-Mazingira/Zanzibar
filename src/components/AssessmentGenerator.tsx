@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import { MODELS, ASSESSMENT_EXPERT_INSTRUCTION, REPORT_SECTIONS, withLanguage } from '../config/ai';
 import { getSectionPrompt } from '../utils/promptBuilder';
 import { streamAIResponse } from '../services/aiClient';
+import { useStreamReader } from '../hooks/useStreamReader';
 import { usePiAuth } from '../contexts/PiAuthContext';
 import { PiPaymentButton } from './PiPaymentButton';
 import { useI18n } from '../config/i18n';
@@ -47,6 +48,7 @@ export const AssessmentGenerator: React.FC = () => {
   const { addToast } = useToasts();
   const { t, language } = useI18n();
   const { user, sdkAvailable } = usePiAuth();
+  const { readStream } = useStreamReader();
   const reportContainerRef = React.useRef<HTMLDivElement | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -77,7 +79,6 @@ export const AssessmentGenerator: React.FC = () => {
     let fullReport = '';
     
     try {
-      const decoder = new TextDecoder();
       const model = useDeepAnalysis ? MODELS.pro : MODELS.flash;
       const task = useDeepAnalysis ? 'complexGeneration' : 'chat';
 
@@ -90,18 +91,20 @@ export const AssessmentGenerator: React.FC = () => {
               model,
           });
 
-          const sectionReader = sectionStream.getReader();
-          while (true) {
-              const { done, value } = await sectionReader.read();
-              if (done) break;
-              
-              const chunk = decoder.decode(value, { stream: true });
+          let sectionText = '';
+          let timeoutId: ReturnType<typeof setTimeout> | null = null;
+          await readStream(sectionStream, chunk => {
+              sectionText += chunk;
               fullReport += chunk;
-              setGeneratedReport(prev => (prev ?? '') + chunk);
-          }
+              if (timeoutId) clearTimeout(timeoutId);
+              timeoutId = setTimeout(() => setGeneratedReport(fullReport), 50);
+          });
+          if (timeoutId) clearTimeout(timeoutId);
+          setGeneratedReport(fullReport);
+          
           if (!fullReport.endsWith('\n\n')) {
                fullReport += '\n\n';
-               setGeneratedReport(prev => (prev ?? '') + '\n\n');
+               setGeneratedReport(fullReport);
           }
       }
       

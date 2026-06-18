@@ -19,6 +19,7 @@ const defaultConfig: AiProviderConfig = {
   ollamaModel: 'llama3.1:latest',
   openRouterKey: '',
   openRouterModel: 'deepseek/deepseek-v4-flash-free',
+  qvacModel: 'qvac-model',
 };
 
 const AiProviderCtx = React.createContext<AiProviderState | undefined>(undefined);

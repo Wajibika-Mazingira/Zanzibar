@@ -8,12 +8,10 @@ environmental monitoring project using Raspberry Pi 5.
 
 import os
 import sys
+import time
 import argparse
 import logging
 from typing import List
-
-# Add the sensor_integration module to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'sensor_integration'))
 
 from sensor_config import (
     SensorConfig, SensorType, SystemConfig,
@@ -305,6 +303,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    import time
-    import threading
     main()

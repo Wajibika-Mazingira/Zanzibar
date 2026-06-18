@@ -114,8 +114,8 @@ class SensorConfig:
             SensorType.TEMPERATURE, SensorType.HUMIDITY, 
             SensorType.SOIL_MOISTURE, SensorType.LIGHT
         ]:
-            if gpio_pin < 0 or gpio_pin > 40:
-                raise ValueError(f"Invalid GPIO pin: {gpio_pin}. Must be between 0 and 40.")
+            if gpio_pin < 0 or gpio_pin > 27:
+                raise ValueError(f"Invalid GPIO pin: {gpio_pin}. Must be between 0 and 27 for Raspberry Pi.")
     
     def to_dict(self) -> Dict:
         """Convert sensor config to dictionary"""
@@ -586,7 +586,6 @@ def get_default_sensor_configs() -> List[SensorConfig]:
     ]
 
 # Environment variable-based configuration
-import os
 
 def get_system_config_from_env() -> SystemConfig:
     """Get system configuration from environment variables"""

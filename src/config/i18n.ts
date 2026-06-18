@@ -311,10 +311,8 @@ const SWAHILI: Record<string, TranslationValue> = {
   'aiConfig.toast.saved': 'Mtoa huduma wa AI amewekwa',
   'aiConfig.toast.ollamaConnected': 'Ollama imeunganishwa!',
   'aiConfig.toast.openrouterConnected': 'OpenRouter imeunganishwa!',
-  'aiConfig.toast.qvacConnected': 'QVAC imeunganishwa!',
   'aiConfig.toast.connectionFailed': 'Muunganisho umeshindwa',
   'aiConfig.toast.noKey': 'Hakuna ufunguo wa API',
-  'aiConfig.toast.qvacConnectionFailed': 'Kuunganisha kwa QVAC kumeshindwa. Tafadhali hakikisha QVAC inafanya kazi ndani ya port 8080. Tembelea https://docs.qvac.tether.io kwa maagizo.',
 
   // Carbon Passport
   'nav.passport': 'Pasipoti ya Kaboni',
@@ -557,7 +555,6 @@ const ENGLISH: Record<string, string> = {
   'market.refresh': 'Refresh',
   'market.analyzing': 'Analyzing market…',
   'market.insight.empty': 'Click "Refresh" for AI-powered carbon market analysis.',
-  'market.refresh': 'Refresh',
   'market.toast.ordered': 'Buy order placed',
   'market.toast.sellOrdered': 'Sell order placed',
   'market.toast.cancelled': 'Order cancelled.',
@@ -708,10 +705,8 @@ const ENGLISH: Record<string, string> = {
   'aiConfig.toast.saved': 'AI provider configured',
   'aiConfig.toast.ollamaConnected': 'Ollama connected!',
   'aiConfig.toast.openrouterConnected': 'OpenRouter connected!',
-  'aiConfig.toast.qvacConnected': 'QVAC connected!',
   'aiConfig.toast.connectionFailed': 'Connection failed',
   'aiConfig.toast.noKey': 'No API key',
-  'aiConfig.toast.qvacConnectionFailed': 'QVAC connection failed. Please ensure QVAC is running locally on port 8080. Visit https://docs.qvac.tether.io for setup instructions.',
 
   // Carbon Passport
   'nav.passport': 'Carbon Passport',

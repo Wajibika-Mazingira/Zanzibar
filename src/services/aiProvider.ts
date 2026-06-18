@@ -126,34 +126,6 @@ export class OllamaProvider implements AiProvider {
     });
   }
 
-  private cleanContent(content: string): string {
-    // Basic validation and cleaning
-    if (!content || typeof content !== 'string') return '';
-    
-    // Remove excessive whitespace
-    let cleaned = content.trim();
-    
-    // Basic spell check for common misspellings
-    const commonCorrections: Record<string, string> = {
-      'wierd': 'weird',
-      'seperate': 'separate',
-      'accept': 'except',
-      'except': 'except',
-      'recieve': 'receive',
-      'definately': 'definitely',
-      'occured': 'occurred',
-      ' occured': ' occurred',
-    };
-    
-    // Apply corrections
-    for (const [incorrect, correct] of Object.entries(commonCorrections)) {
-      const regex = new RegExp(`\b${incorrect}\b`, 'gi');
-      cleaned = cleaned.replace(regex, correct);
-    }
-    
-    return cleaned;
-  }
-
   async streamChat(
     messages: AiMessage[],
     systemInstruction?: string,
@@ -253,7 +225,7 @@ export class OllamaProvider implements AiProvider {
     }
 
     const json = await res.json();
-    const cleanedText = this.cleanContent(json.message?.content || '');
+    const cleanedText = cleanContent(json.message?.content || '');
     return { text: cleanedText };
   }
 }
@@ -288,6 +260,7 @@ export class OpenRouterProvider implements AiProvider {
     messages: AiMessage[],
     systemInstruction?: string,
     model?: string,
+    _options?: AiStreamOptions,
   ): Promise<ReadableStream<Uint8Array>> {
     const orMessages: { role: string; content: string }[] = [];
     if (systemInstruction) {
@@ -425,33 +398,26 @@ export class OpenRouterProvider implements AiProvider {
     }
 
     const json = await res.json();
-    const cleanedText = this.cleanContent(json.choices?.[0]?.message?.content || '');
+    const cleanedText = cleanContent(json.choices?.[0]?.message?.content || '');
     return { text: cleanedText };
   }
+}
 
-  private cleanContent(content: string): string {
-    if (!content || typeof content !== 'string') return '';
-    
-    let cleaned = content.trim();
-    
-    const commonCorrections: Record<string, string> = {
-      'wierd': 'weird',
-      'seperate': 'separate',
-      'accept': 'except',
-      'except': 'except',
-      'recieve': 'receive',
-      'definately': 'definitely',
-      'occured': 'occurred',
-      ' occured': ' occurred',
-    };
-    
-    for (const [incorrect, correct] of Object.entries(commonCorrections)) {
-      const regex = new RegExp(`\b${incorrect}\b`, 'gi');
-      cleaned = cleaned.replace(regex, correct);
-    }
-    
-    return cleaned;
+function cleanContent(content: string): string {
+  if (!content || typeof content !== 'string') return '';
+  let cleaned = content.trim();
+  const commonCorrections: Record<string, string> = {
+    'wierd': 'weird',
+    'seperate': 'separate',
+    'recieve': 'receive',
+    'definately': 'definitely',
+    'occured': 'occurred',
+  };
+  for (const [incorrect, correct] of Object.entries(commonCorrections)) {
+    const regex = new RegExp(`\\b${incorrect}\\b`, 'gi');
+    cleaned = cleaned.replace(regex, correct);
   }
+  return cleaned;
 }
 
 const DEFAULT_QVAC_MODEL = 'qvac-model';
@@ -624,32 +590,8 @@ export class QvacProvider implements AiProvider {
     }
 
     const json = await res.json();
-    const cleanedText = this.cleanContent(json.choices?.[0]?.message?.content || '');
+    const cleanedText = cleanContent(json.choices?.[0]?.message?.content || '');
     return { text: cleanedText };
-  }
-
-  private cleanContent(content: string): string {
-    if (!content || typeof content !== 'string') return '';
-    
-    let cleaned = content.trim();
-    
-    const commonCorrections: Record<string, string> = {
-      'wierd': 'weird',
-      'seperate': 'separate',
-      'accept': 'except',
-      'except': 'except',
-      'recieve': 'receive',
-      'definately': 'definitely',
-      'occured': 'occurred',
-      ' occured': ' occurred',
-    };
-    
-    for (const [incorrect, correct] of Object.entries(commonCorrections)) {
-      const regex = new RegExp(`\b${incorrect}\b`, 'gi');
-      cleaned = cleaned.replace(regex, correct);
-    }
-    
-    return cleaned;
   }
 }
 

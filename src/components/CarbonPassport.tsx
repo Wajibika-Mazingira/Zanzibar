@@ -119,6 +119,16 @@ function generateMockPassport(projects: CarbonProject[]): CarbonPassport | null 
   };
 }
 
+const SensorBadge: React.FC<{ type: SensorType }> = ({ type }) => {
+  const info = sensorLabels[type];
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs font-medium">
+      <span>{info.icon}</span>
+      <span>{info.label}</span>
+    </span>
+  );
+};
+
 export const CarbonPassportComponent: React.FC = () => {
   const [projects] = useLocalStorage<CarbonProject[]>('carbonProjects', []);
   const [passports, setPassports] = useLocalStorage<CarbonPassport[]>('carbonPassports', []);
@@ -211,16 +221,6 @@ export const CarbonPassportComponent: React.FC = () => {
     a.click();
     URL.revokeObjectURL(url);
     addToast({ type: 'info', message: language === 'sw' ? 'Pasipoti imesafirishwa.' : 'Passport exported.' });
-  };
-
-  const SensorBadge: React.FC<{ type: SensorType }> = ({ type }) => {
-    const info = sensorLabels[type];
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs font-medium">
-        <span>{info.icon}</span>
-        <span>{info.label}</span>
-      </span>
-    );
   };
 
   return (
@@ -386,7 +386,7 @@ export const CarbonPassportComponent: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-xs text-slate-500">{t('passport.coordinates')}</p>
-                    <p className="text-sm font-semibold text-xs">{passport.device.location.latitude.toFixed(4)}, {passport.device.location.longitude.toFixed(4)}</p>
+                    <p className="text-xs font-semibold">{passport.device.location.latitude.toFixed(4)}, {passport.device.location.longitude.toFixed(4)}</p>
                   </div>
                 </div>
                 <div>

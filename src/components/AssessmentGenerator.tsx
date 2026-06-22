@@ -1,15 +1,13 @@
 import * as React from 'react';
-import { Assessment, AssessmentType } from '../types';
+import { Assessment, AssessmentType, Evidence } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToasts } from '../hooks/useToasts';
 import { Card } from './common/Card';
 import ReactMarkdown from 'react-markdown';
-import { MODELS, ASSESSMENT_EXPERT_INSTRUCTION, REPORT_SECTIONS, withLanguage } from '../config/ai';
+import { MODELS, getAssessmentInstruction, REPORT_SECTIONS, withLanguage } from '../config/ai';
 import { getSectionPrompt } from '../utils/promptBuilder';
 import { streamAIResponse } from '../services/aiClient';
 import { useStreamReader } from '../hooks/useStreamReader';
-import { usePiAuth } from '../contexts/PiAuthContext';
-import { PiPaymentButton } from './PiPaymentButton';
 import { useI18n } from '../config/i18n';
 
 const assessmentTypes: { value: AssessmentType; label: string }[] = [
@@ -19,6 +17,11 @@ const assessmentTypes: { value: AssessmentType; label: string }[] = [
   { value: 'Climate', label: 'Climate' },
   { value: 'Carbon_Sequestration', label: 'Carbon Sequestration' },
   { value: 'Cumulative', label: 'Cumulative' },
+  { value: 'Project_Monitoring', label: 'Project Monitoring' },
+  { value: 'Community_Engagement', label: 'Community Engagement' },
+  { value: 'Compliance_Verification', label: 'Compliance Verification' },
+  { value: 'Financial_Analysis', label: 'Financial Analysis' },
+  { value: 'Risk_Assessment', label: 'Risk Assessment' },
 ];
 
 const EditIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -28,7 +31,7 @@ const EditIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export const AssessmentGenerator: React.FC = () => {
-  const [formData, setFormData] = React.useState<Omit<Assessment, 'id' | 'report' | 'createdAt' | 'evidence'>>({
+  const [formData, setFormData] = useLocalStorage<Omit<Assessment, 'id' | 'report' | 'createdAt' | 'evidence'>>('assessmentFormData', {
     projectName: '',
     projectProponent: '',
     location: '',
@@ -38,16 +41,14 @@ export const AssessmentGenerator: React.FC = () => {
     assessorName: '',
     assessorType: '',
   });
-  const [generatedReport, setGeneratedReport] = React.useState<string | null>(null);
-  const [editedReport, setEditedReport] = React.useState('');
-  const [isEditing, setIsEditing] = React.useState(false);
+  const [generatedReport, setGeneratedReport] = useLocalStorage<string | null>('assessmentGeneratedReport', null);
+  const [editedReport, setEditedReport] = useLocalStorage<string>('assessmentEditedReport', '');
+  const [isEditing, setIsEditing] = useLocalStorage<boolean>('assessmentIsEditing', false);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [useDeepAnalysis, setUseDeepAnalysis] = React.useState(false);
-  const [deepAnalysisUnlocked, setDeepAnalysisUnlocked] = React.useState(false);
+  const [useDeepAnalysis, setUseDeepAnalysis] = useLocalStorage<boolean>('assessmentDeepAnalysis', false);
   const [assessments, setAssessments] = useLocalStorage<Assessment[]>('assessments', []);
   const { addToast } = useToasts();
   const { t, language } = useI18n();
-  const { user, sdkAvailable } = usePiAuth();
   const { readStream } = useStreamReader();
   const reportContainerRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -87,18 +88,16 @@ export const AssessmentGenerator: React.FC = () => {
           
           const sectionStream = await streamAIResponse(task, {
               messages: [{ role: 'user', text: sectionPrompt }],
-              systemInstruction: withLanguage(ASSESSMENT_EXPERT_INSTRUCTION, language),
+              systemInstruction: withLanguage(getAssessmentInstruction(formData.assessmentType), language),
               model,
           });
 
-          let sectionText = '';
           let timeoutId: ReturnType<typeof setTimeout> | null = null;
           await readStream(sectionStream, chunk => {
-              sectionText += chunk;
               fullReport += chunk;
               if (timeoutId) clearTimeout(timeoutId);
               timeoutId = setTimeout(() => setGeneratedReport(fullReport), 50);
-          });
+          }, undefined, { streamTimeout: 45000, totalTimeout: 180000 });
           if (timeoutId) clearTimeout(timeoutId);
           setGeneratedReport(fullReport);
           
@@ -143,16 +142,38 @@ export const AssessmentGenerator: React.FC = () => {
         return;
     }
 
+    const report = isEditing ? editedReport : generatedReport;
+
+    // Extract key sections from the report as evidence entries
+    const evidenceEntries: Evidence[] = [];
+    const sectionRegex = /###\s+([\d.]+)\s+(.+)/g;
+    let sectionMatch;
+    let sectionIndex = 0;
+    while ((sectionMatch = sectionRegex.exec(report)) !== null && sectionIndex < 8) {
+      const sectionTitle = sectionMatch[0].trim();
+      const sectionEnd = report.indexOf('###', sectionMatch.index + 1);
+      const sectionContent = sectionEnd === -1
+        ? report.slice(sectionMatch.index)
+        : report.slice(sectionMatch.index, sectionEnd);
+      evidenceEntries.push({
+        id: `ev-${Date.now()}-${sectionIndex}`,
+        type: 'text',
+        name: sectionTitle.replace('### ', ''),
+        data: sectionContent.trim(),
+      });
+      sectionIndex++;
+    }
+
     const newAssessment: Assessment = {
         id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         ...formData,
-        report: isEditing ? editedReport : generatedReport,
+        report,
         createdAt: new Date().toISOString(),
-        evidence: [],
+        evidence: evidenceEntries.length > 0 ? evidenceEntries : [],
     };
     
     setAssessments([newAssessment, ...assessments]);
-    addToast({ type: 'success', message: 'Assessment saved to Evidence Locker.' });
+    addToast({ type: 'success', message: `Assessment saved to Evidence Locker with ${evidenceEntries.length} related assets.` });
     
     setFormData({
         projectName: '', projectProponent: '', location: '', projectType: '', description: '',
@@ -221,32 +242,17 @@ export const AssessmentGenerator: React.FC = () => {
                         <span id="deep-analysis-label" className="font-medium text-slate-700">{t('assessment.deepAnalysis')}</span>
                         <p className="text-xs text-slate-500">{t('assessment.deepAnalysis.desc')}</p>
                     </div>
-                    {(!sdkAvailable || deepAnalysisUnlocked || !user) ? (
-                      <button
-                          type="button"
-                          role="switch"
-                          id="deepAnalysis"
-                          aria-labelledby="deep-analysis-label"
-                          aria-checked={useDeepAnalysis}
-                          onClick={() => setUseDeepAnalysis(!useDeepAnalysis)}
-                          className={`${useDeepAnalysis ? 'bg-brand-green-600' : 'bg-slate-200'} relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green-500 focus:ring-offset-2`}
-                      >
-                          <span className={`${useDeepAnalysis ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}/>
-                      </button>
-                    ) : (
-                      <PiPaymentButton
-                        amount={0.1}
-                        memo="Unlock Deep Analysis for one session"
-                        metadata={{ feature: 'deep_analysis' }}
-                        onPaymentSuccess={() => {
-                          setDeepAnalysisUnlocked(true);
-                          setUseDeepAnalysis(true);
-                        }}
-                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-yellow-500 text-yellow-900 hover:bg-yellow-400 transition-colors disabled:opacity-50"
-                      >
-                        {t('assessment.unlock.deep')}
-                      </PiPaymentButton>
-                    )}
+                    <button
+                        type="button"
+                        role="switch"
+                        id="deepAnalysis"
+                        aria-labelledby="deep-analysis-label"
+                        aria-checked={useDeepAnalysis}
+                        onClick={() => setUseDeepAnalysis(!useDeepAnalysis)}
+                        className={`${useDeepAnalysis ? 'bg-brand-green-600' : 'bg-slate-200'} relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green-500 focus:ring-offset-2`}
+                    >
+                        <span className={`${useDeepAnalysis ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}/>
+                    </button>
                 </div>
             </div>
             <div className="p-4 bg-slate-50 border-t border-slate-200">

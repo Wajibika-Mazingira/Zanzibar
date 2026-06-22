@@ -1,10 +1,10 @@
-export type Page = 'assessment' | 'chat' | 'locker' | 'carbon' | 'market' | 'governance' | 'zanzibar' | 'passport';
+export type Page = 'assessment' | 'chat' | 'locker' | 'carbon' | 'market' | 'governance' | 'zanzibar' | 'passport' | 'wallet';
 
 export type AssessmentType = 'Environmental' | 'Social' | 'Health' | 'Climate' | 'Cumulative' | 'Carbon_Sequestration' | 'Project_Monitoring' | 'Community_Engagement' | 'Compliance_Verification' | 'Financial_Analysis' | 'Risk_Assessment';
 
 export interface Evidence {
   id: string;
-  type: 'image';
+  type: 'image' | 'text';
   name: string;
   data: string;
   analysis?: string;

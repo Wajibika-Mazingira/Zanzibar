@@ -5,8 +5,11 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToasts } from '../hooks/useToasts';
 import { useI18n } from '../config/i18n';
 import {
-  CarbonPassport, SensorType, CarbonProject,
+  CarbonPassport, SensorType, CarbonProject, PassportEventType,
+  SignedObservation, PassportEvent, CommunityVerification,
 } from '../types';
+
+const ALL_SENSORS: SensorType[] = ['acoustic', 'visual', 'salinity', 'water_level', 'biomass', 'weather', 'gps', 'water_quality'];
 
 const sensorLabels: Record<SensorType, { icon: string; label: string; unit: string }> = {
   acoustic: { icon: '🎤', label: 'Acoustic', unit: 'dB' },
@@ -37,85 +40,140 @@ const eventIcons: Record<string, string> = {
   intervention: '🛠️',
 };
 
+const EVENT_TYPES: PassportEventType[] = ['restoration', 'degradation', 'monitoring', 'verification', 'intervention'];
+
+const MS_DAY = 86400000;
+const MS_HOUR = 3600000;
+
+function generateBoundary(centerLat: number, centerLng: number): { latitude: number; longitude: number }[] {
+  const offsets = [
+    { lat: 0.01, lng: 0.01 },
+    { lat: 0.01, lng: -0.01 },
+    { lat: -0.01, lng: -0.01 },
+    { lat: -0.01, lng: 0.01 },
+  ];
+  return offsets.map(o => ({
+    latitude: Math.round((centerLat + o.lat + (Math.random() - 0.5) * 0.005) * 10000) / 10000,
+    longitude: Math.round((centerLng + o.lng + (Math.random() - 0.5) * 0.005) * 10000) / 10000,
+  }));
+}
+
+function generateObservations(deviceId: string, count: number, startOffsetHours: number): SignedObservation[] {
+  return Array.from({ length: count }, (_, i) => {
+    const sensorType = ALL_SENSORS[i % ALL_SENSORS.length];
+    let value: number;
+    if (sensorType === 'gps') {
+      value = Math.round((20 + Math.random() * 80) * 100) / 100;
+    } else if (sensorType === 'water_quality') {
+      value = Math.round((6.0 + Math.random() * 2.5) * 100) / 100;
+    } else {
+      value = Math.round((20 + Math.random() * 80) * 100) / 100;
+    }
+    const ts = Date.now() - (startOffsetHours - i) * MS_HOUR;
+    return {
+      id: `obs-${Date.now().toString(36)}-${i}`,
+      deviceId,
+      sensorType,
+      timestamp: new Date(ts).toISOString(),
+      value,
+      unit: sensorLabels[sensorType].unit,
+      signature: `sig_${Date.now().toString(36)}_${i}`,
+      minAnchoredAt: new Date(ts + 5000).toISOString(),
+      minTxId: `tx_${Date.now().toString(36)}_${i}`,
+    };
+  });
+}
+
 function generateMockPassport(projects: CarbonProject[]): CarbonPassport | null {
   if (projects.length === 0) return null;
   const project = projects[0];
+  // Derive center coordinates from location hash for variety
+  const hash = project.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  const baseLat = -1.0 - (hash % 5) * 0.1;
+  const baseLng = 36.0 + (hash % 5) * 0.2;
+  const boundary = generateBoundary(baseLat, baseLng);
+  const centerLat = boundary.reduce((s, p) => s + p.latitude, 0) / boundary.length;
+  const centerLng = boundary.reduce((s, p) => s + p.longitude, 0) / boundary.length;
+
   return {
     id: `CP-${Date.now().toString(36).toUpperCase()}`,
     projectId: project.id,
     projectName: project.name,
     ecosystemLocation: project.location,
-    boundary: [
-      { latitude: -1.2921, longitude: 36.8219 },
-      { latitude: -1.3021, longitude: 36.8319 },
-      { latitude: -1.3121, longitude: 36.8119 },
-      { latitude: -1.2821, longitude: 36.8019 },
-    ],
+    boundary,
     device: {
-      id: 'VS-001',
-      name: 'VEIN Sense Station Alpha',
+      id: `VS-${(hash % 900) + 100}`,
+      name: `VEIN Sense Station ${['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'][hash % 5]}`,
       firmwareVersion: '2.4.1',
       calibrationStatus: 'calibrated',
-      lastCalibration: new Date(Date.now() - 7 * 86400000).toISOString(),
-      sensors: ['acoustic', 'visual', 'salinity', 'water_level', 'biomass', 'weather', 'water_quality'],
-      location: { latitude: -1.2971, longitude: 36.8169 },
-      installedAt: new Date(Date.now() - 90 * 86400000).toISOString(),
-      batteryLevel: 87,
+      lastCalibration: new Date(Date.now() - 7 * MS_DAY).toISOString(),
+      sensors: ALL_SENSORS,
+      location: { latitude: centerLat, longitude: centerLng },
+      installedAt: new Date(Date.now() - 90 * MS_DAY).toISOString(),
+      batteryLevel: 60 + Math.floor(Math.random() * 35),
     },
-    observations: Array.from({ length: 12 }, (_, i) => ({
-      id: `obs-${i}`,
-      deviceId: 'VS-001',
-      sensorType: ['acoustic', 'visual', 'salinity', 'water_level', 'biomass', 'weather'][i % 6] as SensorType,
-      timestamp: new Date(Date.now() - (11 - i) * 3600000).toISOString(),
-      value: Math.round((20 + Math.random() * 80) * 100) / 100,
-      unit: sensorLabels[['acoustic', 'visual', 'salinity', 'water_level', 'biomass', 'weather'][i % 6] as SensorType].unit,
-      signature: `sig_${Date.now().toString(36)}_${i}`,
-      minAnchoredAt: new Date(Date.now() - (11 - i) * 3600000 + 5000).toISOString(),
-      minTxId: `tx_${Date.now().toString(36)}_${i}`,
-    })),
+    observations: generateObservations(`VS-${(hash % 900) + 100}`, 12, 12),
     edgeAiOutputs: [
       {
-        id: 'ai-1', deviceId: 'VS-001', modelName: 'bioacoustic-classifier-v3',
-        inferenceTimestamp: new Date(Date.now() - 3600000).toISOString(),
+        id: `ai-${Date.now().toString(36)}-1`,
+        deviceId: `VS-${(hash % 900) + 100}`,
+        modelName: 'bioacoustic-classifier-v3',
+        inferenceTimestamp: new Date(Date.now() - MS_HOUR).toISOString(),
         result: 'Species detected: 12 bird species, biodiversity index: 0.78',
-        confidence: 0.89, metrics: { species_count: 12, biodiversity_index: 0.78, signal_quality: 0.92 },
+        confidence: 0.89,
+        metrics: { species_count: 12, biodiversity_index: 0.78, signal_quality: 0.92 },
       },
       {
-        id: 'ai-2', deviceId: 'VS-001', modelName: 'biomass-estimator-v2',
-        inferenceTimestamp: new Date(Date.now() - 7200000).toISOString(),
+        id: `ai-${Date.now().toString(36)}-2`,
+        deviceId: `VS-${(hash % 900) + 100}`,
+        modelName: 'biomass-estimator-v2',
+        inferenceTimestamp: new Date(Date.now() - 2 * MS_HOUR).toISOString(),
         result: 'Above-ground biomass: 45.3 t/ha, Carbon stock: 22.6 tC/ha',
-        confidence: 0.85, metrics: { biomass_tpha: 45.3, carbon_tpha: 22.6, canopy_cover: 0.67 },
+        confidence: 0.85,
+        metrics: { biomass_tpha: 45.3, carbon_tpha: 22.6, canopy_cover: 0.67 },
       },
     ],
     totalSequestered: project.totalTonnesSequestered,
     lastUpdated: new Date().toISOString(),
     events: [
       {
-        id: 'evt-1', type: 'monitoring', timestamp: new Date(Date.now() - 86400000).toISOString(),
+        id: `evt-${Date.now().toString(36)}-1`,
+        type: 'monitoring',
+        timestamp: new Date(Date.now() - MS_DAY).toISOString(),
         description: 'Routine environmental monitoring completed. All sensors operational.',
-        actor: 'VEIN Sense Station Alpha', evidenceRefs: ['obs-0', 'obs-1'], minTxId: `tx_${Date.now().toString(36)}_evt1`,
+        actor: `VEIN Sense Station ${['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'][hash % 5]}`,
+        evidenceRefs: [],
+        minTxId: `tx_${Date.now().toString(36)}_evt1`,
       },
       {
-        id: 'evt-2', type: 'verification', timestamp: new Date(Date.now() - 3 * 86400000).toISOString(),
+        id: `evt-${Date.now().toString(36)}-2`,
+        type: 'verification',
+        timestamp: new Date(Date.now() - 3 * MS_DAY).toISOString(),
         description: 'Community verification conducted. 5 members verified ecosystem state.',
-        actor: 'Kijiji Conservation Group', evidenceRefs: [], minTxId: `tx_${Date.now().toString(36)}_evt2`,
+        actor: 'Kijiji Conservation Group',
+        evidenceRefs: [],
+        minTxId: `tx_${Date.now().toString(36)}_evt2`,
       },
     ],
     verifications: [
       {
-        id: 'ver-1', passportId: 'CP-001', verifier: 'Maria Mwangi',
-        verifierRole: 'Community Elder', timestamp: new Date(Date.now() - 3 * 86400000).toISOString(),
-        status: 'verified', notes: 'Forest boundary intact. No signs of encroachment.',
+        id: `ver-${Date.now().toString(36)}-1`,
+        passportId: `CP-${Date.now().toString(36).toUpperCase()}`,
+        verifier: 'Maria Mwangi',
+        verifierRole: 'Community Elder',
+        timestamp: new Date(Date.now() - 3 * MS_DAY).toISOString(),
+        status: 'verified',
+        notes: 'Forest boundary intact. No signs of encroachment.',
         signature: `ver_sig_${Date.now().toString(36)}`,
       },
     ],
     auditTrail: [
-      { timestamp: new Date(Date.now() - 90 * 86400000).toISOString(), action: 'Device Installed', actor: 'VEIN Sense Technician', minTxId: `tx_${Date.now().toString(36)}_a0`, details: 'Station Alpha deployed at Kijiji Forest.' },
-      { timestamp: new Date(Date.now() - 7 * 86400000).toISOString(), action: 'Calibration', actor: 'System', minTxId: `tx_${Date.now().toString(36)}_a1`, details: 'All sensors calibrated successfully.' },
-      { timestamp: new Date(Date.now() - 86400000).toISOString(), action: 'Observation Batch Anchored', actor: 'VEIN Sense Station Alpha', minTxId: `tx_${Date.now().toString(36)}_a2`, details: '12 observations signed and anchored to Minima.' },
+      { timestamp: new Date(Date.now() - 90 * MS_DAY).toISOString(), action: 'Device Installed', actor: 'VEIN Sense Technician', minTxId: `tx_${Date.now().toString(36)}_a0`, details: `Station deployed at ${project.location}.` },
+      { timestamp: new Date(Date.now() - 7 * MS_DAY).toISOString(), action: 'Calibration', actor: 'System', minTxId: `tx_${Date.now().toString(36)}_a1`, details: 'All sensors calibrated successfully.' },
+      { timestamp: new Date(Date.now() - MS_DAY).toISOString(), action: 'Observation Batch Anchored', actor: 'VEIN Sense', minTxId: `tx_${Date.now().toString(36)}_a2`, details: '12 observations signed and anchored to Minima.' },
     ],
     status: 'active',
-    createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
+    createdAt: new Date(Date.now() - 90 * MS_DAY).toISOString(),
   };
 }
 
@@ -132,12 +190,17 @@ const SensorBadge: React.FC<{ type: SensorType }> = ({ type }) => {
 export const CarbonPassportComponent: React.FC = () => {
   const [projects] = useLocalStorage<CarbonProject[]>('carbonProjects', []);
   const [passports, setPassports] = useLocalStorage<CarbonPassport[]>('carbonPassports', []);
-  const [activePassportId, setActivePassportId] = React.useState<string | null>(null);
-  const [showDeviceDetail, setShowDeviceDetail] = React.useState(false);
+  const [activePassportId, setActivePassportId] = useLocalStorage<string | null>('passportActiveId', null);
+  const [expandedDevice, setExpandedDevice] = React.useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
-  const [sensorFilter, setSensorFilter] = React.useState<SensorType | 'all'>('all');
+  const [sensorFilter, setSensorFilter] = useLocalStorage<SensorType | 'all'>('passportSensorFilter', 'all');
+  const [expandedObs, setExpandedObs] = React.useState<string | null>(null);
+  const [showAddEvent, setShowAddEvent] = useLocalStorage('passportShowAddEvent', false);
+  const [showAddVerification, setShowAddVerification] = useLocalStorage('passportShowAddVerification', false);
+  const [newEvent, setNewEvent] = useLocalStorage('passportNewEvent', { type: 'monitoring' as PassportEventType, description: '', actor: '' });
+  const [newVerification, setNewVerification] = useLocalStorage('passportNewVerification', { verifier: '', verifierRole: '', notes: '', status: 'verified' as 'verified' | 'disputed' | 'pending' });
   const { addToast } = useToasts();
-  const { t, language } = useI18n();
+  const { t } = useI18n();
 
   const passport = React.useMemo(() => {
     if (activePassportId) return passports.find(p => p.id === activePassportId) || null;
@@ -167,7 +230,7 @@ export const CarbonPassportComponent: React.FC = () => {
     }
     setPassports([mock, ...passports]);
     setActivePassportId(mock.id);
-    addToast({ type: 'success', message: language === 'sw' ? 'Pasipoti ya kaboni imeundwa.' : 'Carbon Passport created.' });
+    addToast({ type: 'success', message: t('passport.create.success') });
   };
 
   const handleDeletePassport = () => {
@@ -192,19 +255,11 @@ export const CarbonPassportComponent: React.FC = () => {
 
   const handleRefreshObservations = () => {
     if (!passport) return;
-    const newObservations = Array.from({ length: 12 }, (_, i) => ({
-      id: `obs-${Date.now()}-${i}`,
-      deviceId: passport.device.id,
-      sensorType: ['acoustic', 'visual', 'salinity', 'water_level', 'biomass', 'weather'][i % 6] as SensorType,
-      timestamp: new Date(Date.now() - (11 - i) * 3600000).toISOString(),
-      value: Math.round((20 + Math.random() * 80) * 100) / 100,
-      unit: sensorLabels[['acoustic', 'visual', 'salinity', 'water_level', 'biomass', 'weather'][i % 6] as SensorType].unit,
-      signature: `sig_${Date.now().toString(36)}_${i}`,
-      minAnchoredAt: new Date(Date.now() - (11 - i) * 3600000 + 5000).toISOString(),
-      minTxId: `tx_${Date.now().toString(36)}_${i}`,
-    }));
+    const newObs = generateObservations(passport.device.id, 4, 0);
     const updated = passports.map(p =>
-      p.id === passport.id ? { ...p, observations: newObservations, lastUpdated: new Date().toISOString() } : p
+      p.id === passport.id
+        ? { ...p, observations: [...newObs, ...p.observations], lastUpdated: new Date().toISOString() }
+        : p
     );
     setPassports(updated);
     addToast({ type: 'success', message: t('passport.refresh.success') });
@@ -220,8 +275,87 @@ export const CarbonPassportComponent: React.FC = () => {
     a.download = `carbon-passport-${passport.id}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    addToast({ type: 'info', message: language === 'sw' ? 'Pasipoti imesafirishwa.' : 'Passport exported.' });
+    addToast({ type: 'info', message: t('passport.export.success') });
   };
+
+  const handleExportPdf = () => {
+    if (!passport) return;
+    const reportLines = [
+      `Carbon Passport: ${passport.projectName}`,
+      `Location: ${passport.ecosystemLocation}`,
+      `Status: ${passport.status}`,
+      `Total Sequestered: ${Math.round(passport.totalSequestered)} tCO₂`,
+      `Created: ${new Date(passport.createdAt).toLocaleDateString()}`,
+      '',
+      'Boundary Coordinates:',
+      ...passport.boundary.map((p, i) => `  ${i + 1}. ${p.latitude}, ${p.longitude}`),
+      '',
+      `Device: ${passport.device.name} (${passport.device.id})`,
+      `Battery: ${passport.device.batteryLevel}%`,
+      `Sensors: ${passport.device.sensors.join(', ')}`,
+      '',
+      `Observations: ${passport.observations.length} signed readings`,
+      `Events: ${passport.events.length}`,
+      `Verifications: ${passport.verifications.length}`,
+      `Audit Trail: ${passport.auditTrail.length} entries`,
+    ];
+    const text = reportLines.join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `carbon-passport-${passport.id}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast({ type: 'info', message: t('passport.exportPdf.success') });
+  };
+
+  const handleAddEvent = () => {
+    if (!passport || !newEvent.description.trim()) return;
+    const event: PassportEvent = {
+      id: `evt-${Date.now().toString(36)}`,
+      type: newEvent.type,
+      timestamp: new Date().toISOString(),
+      description: newEvent.description.trim(),
+      actor: newEvent.actor.trim() || 'Community Member',
+      evidenceRefs: [],
+      minTxId: `tx_${Date.now().toString(36)}`,
+    };
+    const updated = passports.map(p =>
+      p.id === passport.id
+        ? { ...p, events: [event, ...p.events], lastUpdated: new Date().toISOString() }
+        : p
+    );
+    setPassports(updated);
+    setNewEvent({ type: 'monitoring', description: '', actor: '' });
+    setShowAddEvent(false);
+    addToast({ type: 'success', message: t('passport.eventAdded') });
+  };
+
+  const handleAddVerification = () => {
+    if (!passport || !newVerification.verifier.trim() || !newVerification.notes.trim()) return;
+    const verification: CommunityVerification = {
+      id: `ver-${Date.now().toString(36)}`,
+      passportId: passport.id,
+      verifier: newVerification.verifier.trim(),
+      verifierRole: newVerification.verifierRole.trim() || 'Community Member',
+      timestamp: new Date().toISOString(),
+      status: newVerification.status,
+      notes: newVerification.notes.trim(),
+      signature: `ver_sig_${Date.now().toString(36)}`,
+    };
+    const updated = passports.map(p =>
+      p.id === passport.id
+        ? { ...p, verifications: [verification, ...p.verifications], lastUpdated: new Date().toISOString() }
+        : p
+    );
+    setPassports(updated);
+    setNewVerification({ verifier: '', verifierRole: '', notes: '', status: 'verified' });
+    setShowAddVerification(false);
+    addToast({ type: 'success', message: t('passport.verificationAdded') });
+  };
+
+  const isDeviceExpanded = expandedDevice === passport?.id;
 
   return (
     <div className="space-y-6">
@@ -231,7 +365,7 @@ export const CarbonPassportComponent: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-800">{t('passport.title')}</h2>
           <p className="text-sm text-slate-500">{t('passport.subtitle')}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={handleCreatePassport}
             className="px-4 py-2 text-sm font-semibold rounded-lg bg-brand-green-600 text-white hover:bg-brand-green-700 focus:outline-none focus:ring-2 focus:ring-brand-green-500">
             {t('passport.create')}
@@ -239,12 +373,17 @@ export const CarbonPassportComponent: React.FC = () => {
           {passport && (
             <>
               <button onClick={handleRefreshObservations}
-                className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                title={t('passport.refresh.tooltip')}>
                 {t('passport.refresh')}
               </button>
               <button onClick={handleExportPassport}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400">
                 {t('passport.export')}
+              </button>
+              <button onClick={handleExportPdf}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                {t('passport.exportPdf')}
               </button>
               <button onClick={() => setDeleteTarget(passport.id)}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-400">
@@ -255,18 +394,19 @@ export const CarbonPassportComponent: React.FC = () => {
         </div>
       </div>
 
-      {/* Passport Selector */}
-      {passports.length > 1 && (
+      {/* Passport Selector — always visible when passports exist */}
+      {passports.length > 0 && (
         <Card>
           <div className="p-3">
             <label className="block text-xs font-semibold text-slate-500 mb-2">{t('passport.selectPassport')}</label>
             <div className="flex flex-wrap gap-2">
               {passports.map(p => (
-                <button key={p.id} onClick={() => { setActivePassportId(p.id); setSensorFilter('all'); }}
+                <button key={p.id} onClick={() => { setActivePassportId(p.id); setSensorFilter('all'); setExpandedObs(null); }}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green-500 ${
                     passport?.id === p.id ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}>
                   {p.projectName}
+                  <span className={`ml-1.5 inline-block w-1.5 h-1.5 rounded-full ${p.status === 'active' ? 'bg-green-400' : p.status === 'pending' ? 'bg-yellow-400' : 'bg-slate-400'}`} />
                 </button>
               ))}
             </div>
@@ -295,21 +435,19 @@ export const CarbonPassportComponent: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">{t('passport.updated')}: {new Date(passport.lastUpdated).toLocaleDateString()}</span>
-                <div className="relative">
-                  <select
-                    value={passport.status}
-                    onChange={(e) => handleStatusChange(e.target.value as 'active' | 'pending' | 'archived')}
-                    className="text-xs font-semibold rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-green-500"
-                    aria-label={t('passport.changeStatus')}
-                  >
-                    <option value="active">{t('passport.status.active')}</option>
-                    <option value="pending">{t('passport.status.pending')}</option>
-                    <option value="archived">{t('passport.status.archived')}</option>
-                  </select>
-                </div>
+                <select
+                  value={passport.status}
+                  onChange={(e) => handleStatusChange(e.target.value as 'active' | 'pending' | 'archived')}
+                  className="text-xs font-semibold rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-green-500"
+                  aria-label={t('passport.changeStatus')}
+                >
+                  <option value="active">{t('passport.status.active')}</option>
+                  <option value="pending">{t('passport.status.pending')}</option>
+                  <option value="archived">{t('passport.status.archived')}</option>
+                </select>
               </div>
             </div>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">{t('passport.location')}</p>
                 <p className="font-semibold text-slate-700">{passport.ecosystemLocation}</p>
@@ -323,6 +461,19 @@ export const CarbonPassportComponent: React.FC = () => {
                 <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">{t('passport.created')}</p>
                 <p className="font-semibold text-slate-700">{new Date(passport.createdAt).toLocaleDateString()}</p>
               </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">{t('passport.deviceId')}</p>
+                <p className="font-semibold text-slate-700">{passport.device.name}</p>
+                <p className="text-xs text-slate-400">FW {passport.device.firmwareVersion}</p>
+              </div>
+            </div>
+            {/* Quick stats bar */}
+            <div className="px-4 pb-4 flex gap-4 text-xs text-slate-500">
+              <span className="flex items-center gap-1"><span className="font-bold text-slate-700">{passport.observations.length}</span> {t('passport.observations').toLowerCase()}</span>
+              <span className="flex items-center gap-1"><span className="font-bold text-slate-700">{passport.edgeAiOutputs.length}</span> AI outputs</span>
+              <span className="flex items-center gap-1"><span className="font-bold text-slate-700">{passport.events.length}</span> events</span>
+              <span className="flex items-center gap-1"><span className="font-bold text-slate-700">{passport.verifications.length}</span> verifications</span>
+              <span className="flex items-center gap-1"><span className="font-bold text-slate-700">{passport.auditTrail.length}</span> audit entries</span>
             </div>
           </Card>
 
@@ -346,11 +497,10 @@ export const CarbonPassportComponent: React.FC = () => {
 
           {/* VEIN Sense Device */}
           <Card>
-            <button 
-              onClick={() => setShowDeviceDetail(!showDeviceDetail)} 
+            <button
+              onClick={() => setExpandedDevice(isDeviceExpanded ? null : passport.id)}
               className="w-full p-4 border-b border-slate-200 flex justify-between items-center hover:bg-slate-50 transition-colors"
-              aria-expanded={showDeviceDetail}
-              aria-controls="device-details-content"
+              aria-expanded={isDeviceExpanded}
             >
               <div className="flex items-center gap-3">
                 <span className="text-2xl">🔬</span>
@@ -361,11 +511,11 @@ export const CarbonPassportComponent: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusColor[passport.device.calibrationStatus]}`}>{passport.device.calibrationStatus}</span>
-                <svg className={`h-5 w-5 text-slate-400 transition-transform ${showDeviceDetail ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                <svg className={`h-5 w-5 text-slate-400 transition-transform ${isDeviceExpanded ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
               </div>
             </button>
-            {showDeviceDetail && (
-              <div id="device-details-content" className="p-4 space-y-4" role="region" aria-labelledby="device-details-title">
+            {isDeviceExpanded && (
+              <div className="p-4 space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-xs text-slate-500">{t('passport.battery')}</p>
@@ -426,34 +576,60 @@ export const CarbonPassportComponent: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
-              {filteredObservations.slice().reverse().map(obs => {
-                const info = sensorLabels[obs.sensorType];
-                return (
-                  <div key={obs.id} className="p-3 flex justify-between items-center hover:bg-slate-50">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{info.icon}</span>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-700">{info.label}</p>
-                        <p className="text-xs text-slate-400">{new Date(obs.timestamp).toLocaleString()}</p>
-                      </div>
+            <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+              {filteredObservations.length === 0 ? (
+                <p className="p-4 text-sm text-slate-400 italic">{t('passport.noObservations')}</p>
+              ) : (
+                filteredObservations.slice().reverse().map(obs => {
+                  const info = sensorLabels[obs.sensorType];
+                  const isExpanded = expandedObs === obs.id;
+                  return (
+                    <div key={obs.id}>
+                      <button
+                        onClick={() => setExpandedObs(isExpanded ? null : obs.id)}
+                        className="w-full p-3 flex justify-between items-center hover:bg-slate-50 text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">{info.icon}</span>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-700">{info.label}</p>
+                            <p className="text-xs text-slate-400">{new Date(obs.timestamp).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="text-right flex items-center gap-2">
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{obs.value} {obs.unit}</p>
+                            {obs.minTxId && <p className="text-[10px] text-brand-green-600 font-mono">✓ {t('passport.anchored')}</p>}
+                          </div>
+                          <svg className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                        </div>
+                      </button>
+                      {isExpanded && (
+                        <div className="px-3 pb-3 pt-1 bg-slate-50 text-xs space-y-1 border-t border-slate-100">
+                          <div className="grid grid-cols-2 gap-2">
+                            <span className="text-slate-500">ID: <span className="font-mono text-slate-700">{obs.id}</span></span>
+                            <span className="text-slate-500">Device: <span className="font-mono text-slate-700">{obs.deviceId}</span></span>
+                            <span className="text-slate-500">Signature: <span className="font-mono text-slate-700 truncate">{obs.signature}</span></span>
+                            {obs.minTxId && <span className="text-slate-500">TxID: <span className="font-mono text-brand-green-600">{obs.minTxId}</span></span>}
+                            {obs.minAnchoredAt && <span className="text-slate-500">Anchored: <span className="text-slate-700">{new Date(obs.minAnchoredAt).toLocaleString()}</span></span>}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-slate-800">{obs.value} {obs.unit}</p>
-                      {obs.minTxId && <p className="text-[10px] text-brand-green-600 font-mono">✓ {t('passport.anchored')}</p>}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </Card>
 
           {/* Edge AI Outputs */}
-          {passport.edgeAiOutputs.length > 0 && (
-            <Card>
-              <div className="p-4 border-b border-slate-200">
-                <h3 className="font-bold text-slate-800">{t('passport.edgeAi')}</h3>
-              </div>
+          <Card>
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="font-bold text-slate-800">{t('passport.edgeAi')}</h3>
+            </div>
+            {passport.edgeAiOutputs.length === 0 ? (
+              <p className="p-4 text-sm text-slate-400 italic">{t('passport.noEdgeAi')}</p>
+            ) : (
               <div className="divide-y divide-slate-100">
                 {passport.edgeAiOutputs.map(ai => (
                   <div key={ai.id} className="p-4">
@@ -473,52 +649,129 @@ export const CarbonPassportComponent: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </Card>
-          )}
+            )}
+          </Card>
 
           {/* Event Log */}
           <Card>
-            <div className="p-4 border-b border-slate-200">
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
               <h3 className="font-bold text-slate-800">{t('passport.events')}</h3>
+              <button onClick={() => setShowAddEvent(!showAddEvent)}
+                className="px-3 py-1 text-xs font-semibold rounded-lg bg-brand-green-50 text-brand-green-700 hover:bg-brand-green-100 transition-colors">
+                {showAddEvent ? t('passport.cancel') : t('passport.addEvent')}
+              </button>
             </div>
-            <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
-              {passport.events.slice().reverse().map(evt => (
-                <div key={evt.id} className="p-3 flex items-start gap-3">
-                  <span className="text-lg flex-shrink-0 mt-0.5">{eventIcons[evt.type] || '📋'}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <p className="text-sm font-semibold text-slate-700">{evt.description}</p>
-                      <span className="text-xs text-slate-400 flex-shrink-0 ml-2">{new Date(evt.timestamp).toLocaleDateString()}</span>
-                    </div>
-                    <p className="text-xs text-slate-500">{evt.actor}</p>
-                    {evt.minTxId && <p className="text-[10px] text-brand-green-600 font-mono">✓ {evt.minTxId}</p>}
+            {showAddEvent && (
+              <div className="p-4 bg-slate-50 border-b border-slate-200 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('passport.eventType')}</label>
+                    <select value={newEvent.type} onChange={e => setNewEvent({ ...newEvent, type: e.target.value as PassportEventType })}
+                      className="w-full text-sm border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-green-500">
+                      {EVENT_TYPES.map(et => <option key={et} value={et}>{et}</option>)}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('passport.eventDescription')}</label>
+                    <input type="text" value={newEvent.description} onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
+                      placeholder={t('passport.eventDescription.placeholder')}
+                      className="w-full text-sm border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
                   </div>
                 </div>
-              ))}
+                <div className="flex items-center gap-3">
+                  <input type="text" value={newEvent.actor} onChange={e => setNewEvent({ ...newEvent, actor: e.target.value })}
+                    placeholder={t('passport.eventActor.placeholder')}
+                    className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
+                  <button onClick={handleAddEvent} disabled={!newEvent.description.trim()}
+                    className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-brand-green-600 text-white hover:bg-brand-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    {t('passport.save')}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
+              {passport.events.length === 0 ? (
+                <p className="p-4 text-sm text-slate-400 italic">{t('passport.noEvents')}</p>
+              ) : (
+                passport.events.slice().reverse().map(evt => (
+                  <div key={evt.id} className="p-3 flex items-start gap-3">
+                    <span className="text-lg flex-shrink-0 mt-0.5">{eventIcons[evt.type] || '📋'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-semibold text-slate-700">{evt.description}</p>
+                        <span className="text-xs text-slate-400 flex-shrink-0 ml-2">{new Date(evt.timestamp).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-xs text-slate-500">{evt.actor}</p>
+                      {evt.minTxId && <p className="text-[10px] text-brand-green-600 font-mono">✓ {evt.minTxId}</p>}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
 
           {/* Community Verification */}
           <Card>
-            <div className="p-4 border-b border-slate-200">
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
               <h3 className="font-bold text-slate-800">{t('passport.verifications')}</h3>
+              <button onClick={() => setShowAddVerification(!showAddVerification)}
+                className="px-3 py-1 text-xs font-semibold rounded-lg bg-brand-green-50 text-brand-green-700 hover:bg-brand-green-100 transition-colors">
+                {showAddVerification ? t('passport.cancel') : t('passport.addVerification')}
+              </button>
             </div>
+            {showAddVerification && (
+              <div className="p-4 bg-slate-50 border-b border-slate-200 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('passport.verifierName')}</label>
+                    <input type="text" value={newVerification.verifier} onChange={e => setNewVerification({ ...newVerification, verifier: e.target.value })}
+                      className="w-full text-sm border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('passport.verifierRole')}</label>
+                    <input type="text" value={newVerification.verifierRole} onChange={e => setNewVerification({ ...newVerification, verifierRole: e.target.value })}
+                      placeholder={t('passport.verifierRole.placeholder')}
+                      className="w-full text-sm border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('passport.verificationNotes')}</label>
+                  <textarea value={newVerification.notes} onChange={e => setNewVerification({ ...newVerification, notes: e.target.value })}
+                    rows={2}
+                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <select value={newVerification.status} onChange={e => setNewVerification({ ...newVerification, status: e.target.value as 'verified' | 'disputed' | 'pending' })}
+                    className="text-sm border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-green-500">
+                    <option value="verified">{t('passport.status.verified')}</option>
+                    <option value="pending">{t('passport.status.pending')}</option>
+                    <option value="disputed">{t('passport.status.disputed')}</option>
+                  </select>
+                  <button onClick={handleAddVerification} disabled={!newVerification.verifier.trim() || !newVerification.notes.trim()}
+                    className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-brand-green-600 text-white hover:bg-brand-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    {t('passport.save')}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
               {passport.verifications.length === 0 ? (
                 <p className="p-4 text-sm text-slate-400 italic">{t('passport.noVerifications')}</p>
-              ) : passport.verifications.map(v => (
-                <div key={v.id} className="p-3">
-                  <div className="flex justify-between items-start mb-1">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-700">{v.verifier}</p>
-                      <p className="text-xs text-slate-500">{v.verifierRole}</p>
+              ) : (
+                passport.verifications.map(v => (
+                  <div key={v.id} className="p-3">
+                    <div className="flex justify-between items-start mb-1">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">{v.verifier}</p>
+                        <p className="text-xs text-slate-500">{v.verifierRole}</p>
+                      </div>
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusColor[v.status]}`}>{v.status}</span>
                     </div>
-                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusColor[v.status]}`}>{v.status}</span>
+                    <p className="text-sm text-slate-600 mt-1">{v.notes}</p>
+                    <p className="text-xs text-slate-400 mt-1">{new Date(v.timestamp).toLocaleString()}</p>
                   </div>
-                  <p className="text-sm text-slate-600 mt-1">{v.notes}</p>
-                  <p className="text-xs text-slate-400 mt-1">{new Date(v.timestamp).toLocaleString()}</p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </Card>
 
@@ -527,30 +780,34 @@ export const CarbonPassportComponent: React.FC = () => {
             <div className="p-4 border-b border-slate-200">
               <h3 className="font-bold text-slate-800">{t('passport.auditTrail')}</h3>
             </div>
-            <div className="max-h-48 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
-                  <tr>
-                    <th className="p-2 text-left">{t('passport.date')}</th>
-                    <th className="p-2 text-left">{t('passport.action')}</th>
-                    <th className="p-2 text-left">{t('passport.actor')}</th>
-                    <th className="p-2 text-left hidden md:table-cell">{t('passport.details')}</th>
-                    <th className="p-2 text-left">Tx</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {passport.auditTrail.slice().reverse().map((entry, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
-                      <td className="p-2 text-xs text-slate-500 whitespace-nowrap">{new Date(entry.timestamp).toLocaleDateString()}</td>
-                      <td className="p-2 font-medium text-slate-700">{entry.action}</td>
-                      <td className="p-2 text-xs text-slate-500">{entry.actor}</td>
-                      <td className="p-2 text-xs text-slate-500 hidden md:table-cell">{entry.details}</td>
-                      <td className="p-2"><span className="text-[10px] text-brand-green-600 font-mono">✓</span></td>
+            {passport.auditTrail.length === 0 ? (
+              <p className="p-4 text-sm text-slate-400 italic">{t('passport.noAuditTrail')}</p>
+            ) : (
+              <div className="max-h-48 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
+                    <tr>
+                      <th className="p-2 text-left">{t('passport.date')}</th>
+                      <th className="p-2 text-left">{t('passport.action')}</th>
+                      <th className="p-2 text-left">{t('passport.actor')}</th>
+                      <th className="p-2 text-left hidden md:table-cell">{t('passport.details')}</th>
+                      <th className="p-2 text-left">Tx</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {passport.auditTrail.slice().reverse().map((entry, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="p-2 text-xs text-slate-500 whitespace-nowrap">{new Date(entry.timestamp).toLocaleDateString()}</td>
+                        <td className="p-2 font-medium text-slate-700">{entry.action}</td>
+                        <td className="p-2 text-xs text-slate-500">{entry.actor}</td>
+                        <td className="p-2 text-xs text-slate-500 hidden md:table-cell">{entry.details}</td>
+                        <td className="p-2"><span className="text-[10px] text-brand-green-600 font-mono">✓</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
         </>
       )}

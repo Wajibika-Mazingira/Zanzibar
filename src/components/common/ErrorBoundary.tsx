@@ -2,33 +2,46 @@ import * as React from 'react';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
+  /** Changing this value resets the error state without unmounting the tree. */
+  resetKey?: React.Key;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  errorInfo: React.ErrorInfo | null;
+  prevResetKey?: React.Key;
 }
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorInfo: null, prevResetKey: props.resetKey };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { hasError: true, error };
   }
 
+  componentDidUpdate(_prevProps: ErrorBoundaryProps): void {
+    // Reset error state when resetKey changes (e.g. page navigation)
+    if (this.props.resetKey !== undefined && this.props.resetKey !== this.state.prevResetKey) {
+      this.setState({ hasError: false, error: null, errorInfo: null, prevResetKey: this.props.resetKey });
+    }
+  }
+
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    this.setState({ errorInfo });
+    console.error('[ErrorBoundary] Caught error:', error.message, errorInfo.componentStack);
   }
 
   handleReset = (): void => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, errorInfo: null });
   };
 
   render(): React.ReactNode {
     if (this.state.hasError) {
+      const isDev = import.meta.env.DEV;
       return (
         <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center">
           <svg
@@ -47,12 +60,18 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           </svg>
           <h2 className="text-xl font-bold text-slate-800 mb-2">Something went wrong</h2>
           <p className="text-slate-500 mb-1 max-w-md">
-            An unexpected error occurred. You can try reloading the page or resetting the application.
+            An unexpected error occurred. You can try resetting this section or reload the entire page.
           </p>
-          {this.state.error && (
-            <p className="text-sm text-red-500 mb-4 font-mono max-w-md truncate">
-              {this.state.error.message}
-            </p>
+          {isDev && this.state.error && (
+            <details className="w-full max-w-md mb-4">
+              <summary className="text-sm text-red-500 cursor-pointer hover:text-red-600">
+                Error details (dev mode)
+              </summary>
+              <pre className="mt-2 p-3 bg-red-50 border border-red-200 rounded text-xs text-left text-red-700 overflow-auto max-h-48">
+                {this.state.error.message}
+                {this.state.errorInfo?.componentStack}
+              </pre>
+            </details>
           )}
           <div className="flex gap-3">
             <button

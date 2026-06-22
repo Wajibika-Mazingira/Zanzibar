@@ -1,11 +1,17 @@
 import time
-import os
 import threading
 from datetime import datetime, timedelta
 from typing import List, Dict, Callable, Optional
 import json
 import logging
-import RPi.GPIO as GPIO
+
+try:
+    import RPi.GPIO as GPIO
+    _GPIO_AVAILABLE = True
+except ImportError:
+    GPIO = None  # type: ignore
+    _GPIO_AVAILABLE = False
+
 from enum import Enum, auto
 
 from sensor_config import (
@@ -81,8 +87,11 @@ class GPIOSensorController:
         self.start_time = time.time()
         self.logger = logger
 
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
+        if _GPIO_AVAILABLE:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(False)
+        else:
+            self.logger.warning("RPi.GPIO not available — running in simulation mode")
 
         self.logger.info(f"Initialized GPIO Sensor Controller (System ID: {config.system_id})")
 
@@ -259,7 +268,8 @@ class GPIOSensorController:
 
     def cleanup(self):
         self.stop_monitoring()
-        GPIO.cleanup()
+        if _GPIO_AVAILABLE:
+            GPIO.cleanup()
         self.logger.info("GPIO cleanup completed")
 
 
@@ -274,7 +284,7 @@ class GPIOSensor:
         self.data_points = 0
         self.alert_count = 0
 
-        if self.config.gpio_pin is not None:
+        if self.config.gpio_pin is not None and _GPIO_AVAILABLE:
             GPIO.setup(self.config.gpio_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
         self.controller.logger.info(f"Created GPIO sensor: {config.name} (ID: {config.id})")

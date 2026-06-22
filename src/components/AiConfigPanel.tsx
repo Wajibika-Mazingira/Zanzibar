@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Card } from './common/Card';
-import { useAiProvider, defaultConfig } from '../contexts/AiProviderContext';
+import { useAiProvider, defaultConfig } from '../contexts/aiProviderLib';
 import { useToasts } from '../hooks/useToasts';
 import { useI18n } from '../config/i18n';
 import type { AiProviderConfig, AiProviderType } from '../services/aiProvider';
@@ -15,7 +15,7 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
 
   const handleSave = () => {
     updateConfig(local);
-    addToast({ type: 'success', message: `${t('aiConfig.toast.saved')}: ${local.type === 'ollama' ? t('aiConfig.ollama') : local.type === 'openrouter' ? t('aiConfig.openrouter') : t('aiConfig.qvac')}.` });
+    addToast({ type: 'success', message: `${t('aiConfig.toast.saved')}: ${local.type === 'local' ? 'Local (Offline)' : local.type === 'ollama' ? t('aiConfig.ollama') : local.type === 'openrouter' ? t('aiConfig.openrouter') : t('aiConfig.qvac')}.` });
     onClose();
   };
 
@@ -28,7 +28,7 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(3000) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
-        const models = (json.models || []).map((m: any) => m.name);
+        const models = (json.models || []).map((m: { name: string }) => m.name);
         const llama3Available = models.some((m: string) => m.includes('llama3'));
         addToast({ type: 'success', message: `${t('aiConfig.toast.ollamaConnected')} ${llama3Available ? 'llama3:latest available' : `Models: ${models.slice(0, 3).join(', ')}${models.length > 3 ? '...' : ''}` }` });
       } else if (local.type === 'openrouter') {
@@ -40,17 +40,30 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         addToast({ type: 'success', message: `${t('aiConfig.toast.openrouterConnected')} Credits: ${json.data?.credits || 'N/A'}` });
-      } else {
-        const res = await fetch('http://localhost:11434/v1/models', {
+      } else if (local.type === 'qvac') {
+        const url = (local.qvacUrl || defaultConfig.qvacUrl || 'http://localhost:11434').replace(/\/+$/, '');
+        const headers: Record<string, string> = {};
+        if (local.qvacApiKey) {
+          headers['Authorization'] = `Bearer ${local.qvacApiKey}`;
+        }
+        const res = await fetch(`${url}/v1/models`, {
+          headers,
           signal: AbortSignal.timeout(5000),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        addToast({ type: 'success', message: `${t('aiConfig.toast.qvacConnected')} QVAC is running locally on port 11434` });
+        if (!res.ok) throw new Error(`HTTP ${res.status}${res.status === 404 ? ' — QVAC server may not be running or on a different port' : ''}`);
+        const json = await res.json();
+        const modelList = (json.data || []).map((m: { id: string }) => m.id).join(', ');
+        addToast({ type: 'success', message: `${t('aiConfig.toast.qvacConnected')} Models: ${modelList || 'none loaded'}` });
+      } else {
+        addToast({ type: 'info', message: 'Local (Offline) mode: no connection test needed. Ready to use.' });
+        setTestResult('ok');
+        setTesting(false);
+        return;
       }
       setTestResult('ok');
-    } catch (e: any) {
+    } catch (e: unknown) {
       setTestResult('fail');
-      addToast({ type: 'error', message: `${t('aiConfig.toast.connectionFailed')}: ${e.message}` });
+      addToast({ type: 'error', message: `${t('aiConfig.toast.connectionFailed')}: ${e instanceof Error ? e.message : String(e)}` });
     } finally {
       setTesting(false);
     }
@@ -83,6 +96,10 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
               <button onClick={() => setLocal({ ...local, type: 'qvac' as AiProviderType })}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${local.type === 'qvac' ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                 <span className="block text-lg mb-1">⚡</span>{t('aiConfig.qvac')}
+              </button>
+              <button onClick={() => setLocal({ ...local, type: 'local' as AiProviderType })}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${local.type === 'local' ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                <span className="block text-lg mb-1">📦</span>Local (Offline)
               </button>
             </div>
 
@@ -136,15 +153,38 @@ export const AiConfigPanel: React.FC<{ onClose: () => void }> = ({ onClose }) =>
               <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
                 <h3 className="font-semibold text-sm text-slate-700">{t('aiConfig.qvacSettings')}</h3>
                 <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('aiConfig.serverUrl')}</label>
+                  <input type="text" value={local.qvacUrl || defaultConfig.qvacUrl}
+                    onChange={e => setLocal({ ...local, qvacUrl: e.target.value })}
+                    placeholder="http://localhost:11434"
+                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('aiConfig.apiKey')}</label>
+                  <input type="password" value={local.qvacApiKey || ''}
+                    onChange={e => setLocal({ ...local, qvacApiKey: e.target.value })}
+                    placeholder={t('aiConfig.apiKeyPlaceholder')}
+                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                  <p className="text-xs text-slate-400 mt-1">Optional. Required if QVAC server uses <code>--api-key</code>.</p>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">{t('aiConfig.model')}</label>
                   <input type="text" value={local.qvacModel || defaultConfig.qvacModel}
                     onChange={e => setLocal({ ...local, qvacModel: e.target.value })}
-                    placeholder={t('aiConfig.modelPlaceholder.qvac')}
+                    placeholder="my-llm"
                     className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
-                  <p className="text-xs text-slate-400 mt-1">{t('aiConfig.modelHint.qvac')}</p>
+                  <p className="text-xs text-slate-400 mt-1">Must match a model name on your server (e.g. <code>phi3:mini</code>, <code>llama3:latest</code>).</p>
                 </div>
+              </div>
+            )}
+
+            {/* Local (Offline) Settings */}
+            {local.type === 'local' && (
+              <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
+                <h3 className="font-semibold text-sm text-slate-700">Local (Offline) Mode</h3>
                 <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded">
-                  <strong>Note:</strong> QVAC is a local-first, peer-to-peer AI platform. It runs locally on your machine and doesn't require API keys. Ensure QVAC is running locally on port 11434. Visit <a href="https://docs.qvac.tether.io" target="_blank" rel="noopener noreferrer" className="text-brand-green-600 hover:underline">docs.qvac.tether.io</a> for setup instructions.
+                  <strong>No AI service required.</strong> Uses built-in template responses for all analysis features. 
+                  Works offline for demonstration and testing purposes. To use real AI, select Ollama, OpenRouter, or QVAC.
                 </div>
               </div>
             )}

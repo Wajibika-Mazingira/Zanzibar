@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { MODELS, ASSESSMENT_EXPERT_INSTRUCTION, CHAT_DEFAULT_SYSTEM_INSTRUCTION, REPORT_SECTIONS } from '../config/ai';
 
 describe('MODELS config', () => {
-  it('uses empty strings for provider-defaulted models', () => {
-    expect(MODELS.flash_lite).toBe('');
-    expect(MODELS.flash).toBe('');
-    expect(MODELS.pro).toBe('');
+  it('has valid model IDs for non-TTS models', () => {
+    expect(MODELS.flash_lite).toBe('deepseek/deepseek-v4-flash-free');
+    expect(MODELS.flash).toBe('deepseek/deepseek-v4-flash-free');
+    expect(MODELS.pro).toBe('deepseek/deepseek-v3-0324');
   });
 
   it('defines tts as browser-speechsynthesis', () => {
@@ -23,8 +23,8 @@ describe('system instructions', () => {
     expect(typeof ASSESSMENT_EXPERT_INSTRUCTION).toBe('string');
   });
 
-  it('ASSESSMENT_EXPERT_INSTRUCTION mentions NEMA', () => {
-    expect(ASSESSMENT_EXPERT_INSTRUCTION).toContain('NEMA');
+  it('ASSESSMENT_EXPERT_INSTRUCTION mentions DoE', () => {
+    expect(ASSESSMENT_EXPERT_INSTRUCTION).toContain('DoE');
   });
 
   it('CHAT_DEFAULT_SYSTEM_INSTRUCTION is a non-empty string', () => {

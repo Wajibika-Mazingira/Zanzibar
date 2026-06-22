@@ -1,13 +1,17 @@
 import * as React from 'react';
 import { Card } from './common/Card';
 import { ConfirmDialog } from './common/ConfirmDialog';
+import { EmptyState } from './common/EmptyState';
+import { FormField } from './common/FormField';
+import { useFieldErrors } from '../hooks/useFieldErrors';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToasts } from '../hooks/useToasts';
 import { useStreamReader } from '../hooks/useStreamReader';
 import {
   CarbonProject, CarbonProjectType, CarbonCredit, CarbonMetrics, CarbonPortfolio,
 } from '../types';
-import ProjectCard, { projectTypes } from './ProjectCard';
+import ProjectCard from './ProjectCard';
+import { projectTypes } from '../constants/projectTypes';
 import { streamAIResponse } from '../services/aiClient';
 import { CARBON_EXPERT_INSTRUCTION, withLanguage } from '../config/ai';
 import { useI18n } from '../config/i18n';
@@ -47,13 +51,17 @@ export const CarbonDashboard: React.FC = () => {
     ownedCredits: [], stakedCredits: [], totalSequestered: 0, totalRetired: 0, governanceTokens: 0,
   });
 
-  const [showForm, setShowForm] = React.useState(false);
-  const [formData, setFormData] = React.useState<Partial<CarbonProject>>(initialForm);
+  const [showForm, setShowForm] = useLocalStorage('carbonDashboardShowForm', false);
+  const [formData, setFormData] = useLocalStorage<Partial<CarbonProject>>('carbonDashboardFormData', initialForm());
   const [sdgInput, setSdgInput] = React.useState('');
   const [aiAnalysis, setAiAnalysis] = React.useState<string | null>(null);
+  const [aiError, setAiError] = React.useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+  const [analyzingProjectName, setAnalyzingProjectName] = React.useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
   const [retireTarget, setRetireTarget] = React.useState<string | null>(null);
+  const [isCreating, setIsCreating] = React.useState(false);
+  const fieldErrors = useFieldErrors<{ name: string; location: string; area: string }>();
   const { addToast } = useToasts();
   const { t, language } = useI18n();
   const { readStream } = useStreamReader();
@@ -72,44 +80,54 @@ export const CarbonDashboard: React.FC = () => {
     const issued = credits.reduce((s, c) => s + c.tonnesCO2, 0);
     const retired = credits.filter(c => c.status === 'retired').reduce((s, c) => s + c.tonnesCO2, 0);
     const priced = credits.filter(c => c.status === 'available' || c.status === 'listed');
-    const avgPrice = priced.length > 0
-      ? Math.round(priced.reduce((s, c) => s + c.pricePerTonne, 0) / priced.length * 100) / 100
-      : metrics.currentAveragePrice;
 
-    setMetrics({
-      totalProjects: projects.length,
-      activeProjects: active,
-      totalCreditsIssued: Math.round(issued * 100) / 100,
-      totalCreditsRetired: Math.round(retired * 100) / 100,
-      currentAveragePrice: avgPrice,
-      priceChange24h: metrics.priceChange24h,
-      totalAreaRestored: totalArea,
-      totalTonnesSequestered: Math.round(totalSeq * 100) / 100,
-      priceHistory: metrics.priceHistory,
+    setMetrics(prev => {
+      const avgPrice = priced.length > 0
+        ? Math.round(priced.reduce((s, c) => s + c.pricePerTonne, 0) / priced.length * 100) / 100
+        : prev.currentAveragePrice;
+      return {
+        totalProjects: projects.length,
+        activeProjects: active,
+        totalCreditsIssued: Math.round(issued * 100) / 100,
+        totalCreditsRetired: Math.round(retired * 100) / 100,
+        currentAveragePrice: avgPrice,
+        priceChange24h: prev.priceChange24h,
+        totalAreaRestored: totalArea,
+        totalTonnesSequestered: Math.round(totalSeq * 100) / 100,
+        priceHistory: prev.priceHistory,
+      };
     });
     setPortfolio(prev => ({ ...prev, totalSequestered: totalSeq }));
-  }, [projects, credits]);
+  }, [projects, credits, setMetrics, setPortfolio]);
 
   const handleCreateProject = () => {
-    if (!formData.name?.trim()) { addToast({ type: 'error', message: 'Project name is required.' }); return; }
-    if (!formData.location?.trim()) { addToast({ type: 'error', message: 'Location is required.' }); return; }
-    if (!formData.areaHectares || formData.areaHectares <= 0) { addToast({ type: 'error', message: 'Area must be greater than 0.' }); return; }
+    fieldErrors.clearAll();
+    let valid = true;
+    if (!formData.name?.trim()) { fieldErrors.setError('name', 'Project name is required.'); valid = false; }
+    if (!formData.location?.trim()) { fieldErrors.setError('location', 'Location is required.'); valid = false; }
+    if (!formData.areaHectares || formData.areaHectares <= 0) { fieldErrors.setError('area', 'Area must be greater than 0.'); valid = false; }
+    if (!valid) { addToast({ type: 'error', message: 'Please fix the errors below.' }); return; }
 
-    const id = `CP-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`.toUpperCase();
-    const rate = formData.carbonSequestrationRate || projectTypes.find(p => p.value === formData.projectType)?.rate || 6;
-    const newProject: CarbonProject = {
-      id, name: formData.name!.trim(), description: formData.description?.trim() || '',
-      location: formData.location!.trim(),
-      projectType: formData.projectType as CarbonProjectType,
-      areaHectares: formData.areaHectares, carbonSequestrationRate: rate,
-      startDate: formData.startDate || new Date().toISOString().split('T')[0],
-      status: 'pending', totalCreditsIssued: 0, creditsAvailable: 0,
-      sdgContributions: formData.sdgContributions || [], totalTonnesSequestered: 0,
-    };
-    setProjects([newProject, ...projects]);
-    setShowForm(false);
-    setFormData(initialForm());
-    addToast({ type: 'success', message: `Project "${newProject.name}" created.` });
+    setIsCreating(true);
+    // Simulate async for UX feedback
+    setTimeout(() => {
+      const id = `CP-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`.toUpperCase();
+      const rate = formData.carbonSequestrationRate || projectTypes.find(p => p.value === formData.projectType)?.rate || 6;
+      const newProject: CarbonProject = {
+        id, name: formData.name!.trim(), description: formData.description?.trim() || '',
+        location: formData.location!.trim(),
+        projectType: formData.projectType as CarbonProjectType,
+        areaHectares: formData.areaHectares || 10, carbonSequestrationRate: rate,
+        startDate: formData.startDate || new Date().toISOString().split('T')[0],
+        status: 'pending', totalCreditsIssued: 0, creditsAvailable: 0,
+        sdgContributions: formData.sdgContributions || [], totalTonnesSequestered: 0,
+      };
+      setProjects([newProject, ...projects]);
+      setShowForm(false);
+      setFormData(initialForm());
+      setIsCreating(false);
+      addToast({ type: 'success', message: `Project "${newProject.name}" created.` });
+    }, 300);
   };
 
   const handleActivateProject = (id: string) => {
@@ -159,28 +177,39 @@ export const CarbonDashboard: React.FC = () => {
     addToast({ type: 'success', message: 'Carbon credit retired permanently.' });
   };
 
+  const lastAnalyzedProject = React.useRef<CarbonProject | null>(null);
+
   const handleAnalyzeProject = async (project: CarbonProject) => {
     setIsAnalyzing(true);
+    setAnalyzingProjectName(project.name);
     setAiAnalysis(null);
+    setAiError(null);
+    lastAnalyzedProject.current = project;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     try {
       const stream = await streamAIResponse('chat', {
         messages: [{ role: 'user', text: `Analyze the carbon sequestration potential of this conservation project:\nName: ${project.name}\nLocation: ${project.location}\nType: ${project.projectType}\nArea: ${project.areaHectares} ha\nSequestration Rate: ${project.carbonSequestrationRate} tCO2e/ha/yr\nMethodology: ${project.methodology || 'Not specified'}\nStatus: ${project.status}\n\nProvide: 1. Estimated potential over 10 and 30 years 2. Recommended standards (VCS, Gold Standard, Plan Vivo) 3. Risk assessment (leakage, permanence, additionality) 4. MRV recommendations 5. Estimated credit value at market prices` }],
         systemInstruction: withLanguage(CARBON_EXPERT_INSTRUCTION, language),
       });
       let fullText = '';
-      let timeoutId: ReturnType<typeof setTimeout> | null = null;
       await readStream(stream, chunk => {
         fullText += chunk;
         if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout(() => setAiAnalysis(fullText), 50);
-      });
+      }, undefined, { streamTimeout: 45000, totalTimeout: 180000 });
       if (timeoutId) clearTimeout(timeoutId);
       setAiAnalysis(fullText);
-    } catch {
-      addToast({ type: 'error', message: 'AI analysis failed.' });
+    } catch (e) {
+      if (timeoutId) clearTimeout(timeoutId);
+      setAiError(e instanceof Error ? e.message : 'AI analysis failed.');
     } finally {
       setIsAnalyzing(false);
+      setAnalyzingProjectName(null);
     }
+  };
+
+  const handleRetryAnalysis = () => {
+    if (lastAnalyzedProject.current) handleAnalyzeProject(lastAnalyzedProject.current);
   };
 
   return (
@@ -218,39 +247,33 @@ export const CarbonDashboard: React.FC = () => {
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
                   <h3 className="font-bold text-slate-700">{t('carbon.register.title')}</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="cp-name" className="block text-xs font-medium text-slate-600 mb-1">{t('carbon.project.name')}</label>
-                      <input id="cp-name" type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
-                    </div>
-                    <div>
-                      <label htmlFor="cp-location" className="block text-xs font-medium text-slate-600 mb-1">{t('carbon.project.location')}</label>
-                      <input id="cp-location" type="text" value={formData.location || ''} onChange={e => setFormData({ ...formData, location: e.target.value })} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
-                    </div>
-                    <div>
-                      <label htmlFor="cp-type" className="block text-xs font-medium text-slate-600 mb-1">{t('carbon.project.type')}</label>
+                    <FormField label={t('carbon.project.name')} htmlFor="cp-name" required error={fieldErrors.errors.name}>
+                      <input id="cp-name" type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} onBlur={() => { fieldErrors.markTouched('name'); if (!formData.name?.trim()) fieldErrors.setError('name', 'Project name is required.'); else fieldErrors.clearError('name'); }} maxLength={100} className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[40px] ${fieldErrors.errors.name ? 'border-red-500' : 'border-slate-300'}`} aria-describedby={fieldErrors.errors.name ? 'cp-name-error' : undefined} />
+                    </FormField>
+                    <FormField label={t('carbon.project.location')} htmlFor="cp-location" required error={fieldErrors.errors.location}>
+                      <input id="cp-location" type="text" value={formData.location || ''} onChange={e => setFormData({ ...formData, location: e.target.value })} onBlur={() => { fieldErrors.markTouched('location'); if (!formData.location?.trim()) fieldErrors.setError('location', 'Location is required.'); else fieldErrors.clearError('location'); }} maxLength={100} className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[40px] ${fieldErrors.errors.location ? 'border-red-500' : 'border-slate-300'}`} aria-describedby={fieldErrors.errors.location ? 'cp-location-error' : undefined} />
+                    </FormField>
+                    <FormField label={t('carbon.project.type')} htmlFor="cp-type">
                       <select id="cp-type" value={formData.projectType} onChange={e => {
                         const pt = e.target.value as CarbonProjectType;
                         setFormData({ ...formData, projectType: pt, carbonSequestrationRate: projectTypes.find(p => p.value === pt)?.rate || 6 });
-                      }} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500">
+                      }} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[40px]">
                         {projectTypes.map(pt => <option key={pt.value} value={pt.value}>{pt.icon} {pt.label}</option>)}
                       </select>
-                    </div>
-                    <div>
-                      <label htmlFor="cp-area" className="block text-xs font-medium text-slate-600 mb-1">{t('carbon.project.area')}</label>
-                      <input id="cp-area" type="number" value={formData.areaHectares || ''} onChange={e => setFormData({ ...formData, areaHectares: Math.max(0.1, Number(e.target.value)) })} min="0.1" step="0.1" className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
-                    </div>
-                    <div>
-                      <label htmlFor="cp-rate" className="block text-xs font-medium text-slate-600 mb-1">{t('carbon.project.rate')}</label>
-                      <input id="cp-rate" type="number" value={formData.carbonSequestrationRate || ''} onChange={e => setFormData({ ...formData, carbonSequestrationRate: Math.max(0.1, Number(e.target.value)) })} min="0.1" step="0.1" className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
-                    </div>
-                    <div>
-                      <label htmlFor="cp-date" className="block text-xs font-medium text-slate-600 mb-1">{t('carbon.project.startDate')}</label>
-                      <input id="cp-date" type="date" value={formData.startDate || ''} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
-                    </div>
+                    </FormField>
+                    <FormField label={t('carbon.project.area')} htmlFor="cp-area" required error={fieldErrors.errors.area}>
+                      <input id="cp-area" type="number" value={formData.areaHectares || ''} onChange={e => setFormData({ ...formData, areaHectares: Math.max(0.1, Number(e.target.value)) })} onBlur={() => { fieldErrors.markTouched('area'); if (!formData.areaHectares || formData.areaHectares <= 0) fieldErrors.setError('area', 'Area must be greater than 0.'); else fieldErrors.clearError('area'); }} min="0.1" step="0.1" className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[40px] ${fieldErrors.errors.area ? 'border-red-500' : 'border-slate-300'}`} aria-describedby={fieldErrors.errors.area ? 'cp-area-error' : undefined} />
+                    </FormField>
+                    <FormField label={t('carbon.project.rate')} htmlFor="cp-rate">
+                      <input id="cp-rate" type="number" value={formData.carbonSequestrationRate || ''} onChange={e => setFormData({ ...formData, carbonSequestrationRate: Math.max(0.1, Number(e.target.value)) })} min="0.1" step="0.1" className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[40px]" />
+                    </FormField>
+                    <FormField label={t('carbon.project.startDate')} htmlFor="cp-date">
+                      <input id="cp-date" type="date" value={formData.startDate || ''} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[40px]" />
+                    </FormField>
                   </div>
                   <div>
                     <label htmlFor="cp-desc" className="block text-xs font-medium text-slate-600 mb-1">{t('carbon.project.description')}</label>
-                    <textarea id="cp-desc" value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={2} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
+                    <textarea id="cp-desc" value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={2} maxLength={500} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">{t('carbon.project.sdg')}</label>
@@ -269,19 +292,21 @@ export const CarbonDashboard: React.FC = () => {
                       placeholder={t('carbon.project.sdgPlaceholder')}
                       className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
                   </div>
-                  <button onClick={handleCreateProject}
-                    disabled={!formData.name?.trim() || !formData.location?.trim() || !formData.areaHectares || formData.areaHectares <= 0}
-                    className="w-full py-2 text-sm font-bold text-white bg-brand-green-600 rounded-lg hover:bg-brand-green-700 disabled:bg-slate-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-green-500">
-{t('carbon.project.register')}
-                    </button>
+                  <button onClick={handleCreateProject} disabled={isCreating || !formData.name?.trim() || !formData.location?.trim() || !formData.areaHectares || formData.areaHectares <= 0}
+                    className="w-full py-2 text-sm font-bold text-white bg-brand-green-600 rounded-lg hover:bg-brand-green-700 disabled:bg-slate-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[40px] flex items-center justify-center gap-2">
+                    {isCreating && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>}
+                    {isCreating ? t('carbon.toast.creating') : t('carbon.project.register')}
+                  </button>
                 </div>
               )}
               {projects.length === 0 ? (
-                <div className="text-center py-8" role="status">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
-                  <p className="font-semibold text-slate-500">{t('carbon.empty.title')}</p>
-                  <p className="text-xs text-slate-400 mt-1">{t('carbon.empty.desc')}</p>
-                </div>
+                <EmptyState
+                  icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>}
+                  title={t('carbon.empty.title')}
+                  description={t('carbon.empty.desc')}
+                  actionLabel={t('carbon.newProject')}
+                  onAction={() => setShowForm(true)}
+                />
               ) : (
                 <React.Suspense fallback={<div className="p-6 text-sm text-slate-500">Loading projects…</div>}>
                   {projects.map(p => (
@@ -321,7 +346,7 @@ export const CarbonDashboard: React.FC = () => {
             </div>
           </Card>
           <React.Suspense fallback={<div className="p-3 text-sm text-slate-500">Loading analysis…</div>}>
-            <CarbonAnalysisPanel isAnalyzing={isAnalyzing} aiAnalysis={aiAnalysis} t={t} />
+            <CarbonAnalysisPanel isAnalyzing={isAnalyzing} aiAnalysis={aiAnalysis} aiError={aiError} onRetry={handleRetryAnalysis} analyzingProjectName={analyzingProjectName} t={t} />
           </React.Suspense>
         </div>
       </div>

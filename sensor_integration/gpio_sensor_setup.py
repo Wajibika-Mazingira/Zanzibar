@@ -6,7 +6,6 @@ This script sets up and configures GPIO sensors for the Wajibika Mazingira
 environmental monitoring project using Raspberry Pi 5.
 """
 
-import os
 import sys
 import time
 import argparse
@@ -14,10 +13,10 @@ import logging
 from typing import List
 
 from sensor_config import (
-    SensorConfig, SensorType, SystemConfig,
+    SensorConfig, SystemConfig,
     get_default_sensor_configs, get_system_config_from_env
 )
-from gpio_sensor_controller import GPIOSensorController, get_controller, setup_sensors
+from gpio_sensor_controller import get_controller
 
 # Configure logging
 logging.basicConfig(

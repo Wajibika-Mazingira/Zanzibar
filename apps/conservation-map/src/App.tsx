@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 type ProjectType = 'reforestation' | 'blue-carbon' | 'conservation' | 'renewable-energy' | 'agroforestry'
 type ProjectStatus = 'Active' | 'Planned' | 'Completed'
@@ -12,8 +15,8 @@ interface Project {
   carbonRate: number
   description: string
   status: ProjectStatus
-  x: number
-  y: number
+  lat: number
+  lng: number
 }
 
 const PROJECT_TYPES: { key: ProjectType | 'all'; label: string }[] = [
@@ -26,134 +29,24 @@ const PROJECT_TYPES: { key: ProjectType | 'all'; label: string }[] = [
 ]
 
 const PROJECTS: Project[] = [
-  {
-    id: 1,
-    name: 'Jozani Forest Project',
-    location: 'Zanzibar, Tanzania',
-    type: 'reforestation',
-    area: 1250,
-    carbonRate: 4.8,
-    description: 'Restoration of indigenous forest in Jozani-Chwaka Bay National Park, protecting the endemic Zanzibar red colobus monkey habitat.',
-    status: 'Active',
-    x: 68,
-    y: 55,
-  },
-  {
-    id: 2,
-    name: 'Pemba Mangroves',
-    location: 'Pemba Island, Tanzania',
-    type: 'blue-carbon',
-    area: 3200,
-    carbonRate: 8.2,
-    description: 'Large-scale mangrove restoration along Pemba\'s coastline, enhancing blue carbon sequestration and coastal resilience.',
-    status: 'Active',
-    x: 64,
-    y: 50,
-  },
-  {
-    id: 3,
-    name: 'Mafia Island Coral',
-    location: 'Mafia Island, Tanzania',
-    type: 'conservation',
-    area: 840,
-    carbonRate: 2.1,
-    description: 'Marine protected area management and coral reef restoration in the Mafia Island Marine Park.',
-    status: 'Active',
-    x: 70,
-    y: 60,
-  },
-  {
-    id: 4,
-    name: 'Usambara Reforestation',
-    location: 'Usambara Mountains, Tanzania',
-    type: 'reforestation',
-    area: 2100,
-    carbonRate: 5.6,
-    description: 'Community-led reforestation in the Eastern Arc Mountains, one of the world\'s most biodiverse regions.',
-    status: 'Active',
-    x: 55,
-    y: 48,
-  },
-  {
-    id: 5,
-    name: 'Rwanda Agroforestry',
-    location: 'Eastern Province, Rwanda',
-    type: 'agroforestry',
-    area: 4500,
-    carbonRate: 3.4,
-    description: 'Integrating trees into farming systems across Rwanda\'s eastern plateau to improve soil health and sequester carbon.',
-    status: 'Active',
-    x: 42,
-    y: 38,
-  },
-  {
-    id: 6,
-    name: 'Kenya Rift Solar',
-    location: 'Rift Valley, Kenya',
-    type: 'renewable-energy',
-    area: 1800,
-    carbonRate: 12.5,
-    description: 'Solar energy installation offsetting deforestation for charcoal in Kenya\'s Rift Valley region.',
-    status: 'Planned',
-    x: 48,
-    y: 30,
-  },
-  {
-    id: 7,
-    name: 'Ziwa Blue Carbon',
-    location: 'Ziwa, Kenya',
-    type: 'blue-carbon',
-    area: 2800,
-    carbonRate: 7.9,
-    description: 'Mangrove and seagrass restoration along the Kenyan coast, focusing on community-managed carbon credits.',
-    status: 'Active',
-    x: 61,
-    y: 28,
-  },
-  {
-    id: 8,
-    name: 'Uganda Forest Corridor',
-    location: 'Kibale, Uganda',
-    type: 'conservation',
-    area: 3600,
-    carbonRate: 4.2,
-    description: 'Creating a wildlife corridor between Kibale and Queen Elizabeth National Parks through forest restoration.',
-    status: 'Active',
-    x: 38,
-    y: 25,
-  },
-  {
-    id: 9,
-    name: 'Mikumi Savanna',
-    location: 'Mikumi, Tanzania',
-    type: 'conservation',
-    area: 1500,
-    carbonRate: 1.8,
-    description: 'Savanna ecosystem restoration and wildlife conservation in the Mikumi National Park buffer zone.',
-    status: 'Completed',
-    x: 58,
-    y: 57,
-  },
-  {
-    id: 10,
-    name: 'Mt. Kenya Reforestation',
-    location: 'Mount Kenya, Kenya',
-    type: 'reforestation',
-    area: 1900,
-    carbonRate: 5.1,
-    description: 'High-altitude forest restoration on the slopes of Mount Kenya, protecting critical water catchments.',
-    status: 'Planned',
-    x: 56,
-    y: 22,
-  },
+  { id: 1, name: 'Jozani Forest Project', location: 'Zanzibar, Tanzania', type: 'reforestation', area: 1250, carbonRate: 4.8, description: 'Restoration of indigenous forest in Jozani-Chwaka Bay National Park, protecting the endemic Zanzibar red colobus monkey habitat.', status: 'Active', lat: -6.27, lng: 39.41 },
+  { id: 2, name: 'Pemba Mangroves', location: 'Pemba Island, Tanzania', type: 'blue-carbon', area: 3200, carbonRate: 8.2, description: "Large-scale mangrove restoration along Pemba's coastline, enhancing blue carbon sequestration and coastal resilience.", status: 'Active', lat: -5.07, lng: 39.78 },
+  { id: 3, name: 'Mafia Island Coral', location: 'Mafia Island, Tanzania', type: 'conservation', area: 840, carbonRate: 2.1, description: 'Marine protected area management and coral reef restoration in the Mafia Island Marine Park.', status: 'Active', lat: -7.85, lng: 39.66 },
+  { id: 4, name: 'Usambara Reforestation', location: 'Usambara Mountains, Tanzania', type: 'reforestation', area: 2100, carbonRate: 5.6, description: "Community-led reforestation in the Eastern Arc Mountains, one of the world's most biodiverse regions.", status: 'Active', lat: -4.78, lng: 38.28 },
+  { id: 5, name: 'Rwanda Agroforestry', location: 'Eastern Province, Rwanda', type: 'agroforestry', area: 4500, carbonRate: 3.4, description: "Integrating trees into farming systems across Rwanda's eastern plateau to improve soil health and sequester carbon.", status: 'Active', lat: -1.95, lng: 30.57 },
+  { id: 6, name: 'Kenya Rift Solar', location: 'Rift Valley, Kenya', type: 'renewable-energy', area: 1800, carbonRate: 12.5, description: "Solar energy installation offsetting deforestation for charcoal in Kenya's Rift Valley region.", status: 'Planned', lat: -0.50, lng: 36.00 },
+  { id: 7, name: 'Ziwa Blue Carbon', location: 'Ziwa, Kenya', type: 'blue-carbon', area: 2800, carbonRate: 7.9, description: 'Mangrove and seagrass restoration along the Kenyan coast, focusing on community-managed carbon credits.', status: 'Active', lat: -2.50, lng: 40.50 },
+  { id: 8, name: 'Uganda Forest Corridor', location: 'Kibale, Uganda', type: 'conservation', area: 3600, carbonRate: 4.2, description: 'Creating a wildlife corridor between Kibale and Queen Elizabeth National Parks through forest restoration.', status: 'Active', lat: 0.58, lng: 30.37 },
+  { id: 9, name: 'Mikumi Savanna', location: 'Mikumi, Tanzania', type: 'conservation', area: 1500, carbonRate: 1.8, description: 'Savanna ecosystem restoration and wildlife conservation in the Mikumi National Park buffer zone.', status: 'Completed', lat: -7.41, lng: 37.00 },
+  { id: 10, name: 'Mt. Kenya Reforestation', location: 'Mount Kenya, Kenya', type: 'reforestation', area: 1900, carbonRate: 5.1, description: 'High-altitude forest restoration on the slopes of Mount Kenya, protecting critical water catchments.', status: 'Planned', lat: -0.15, lng: 37.30 },
 ]
 
 const TYPE_COLORS: Record<string, string> = {
-  reforestation: 'bg-green-500',
-  'blue-carbon': 'bg-blue-500',
-  conservation: 'bg-yellow-500',
-  'renewable-energy': 'bg-orange-500',
-  agroforestry: 'bg-teal-500',
+  reforestation: '#22c55e',
+  'blue-carbon': '#3b82f6',
+  conservation: '#eab308',
+  'renewable-energy': '#f97316',
+  agroforestry: '#14b8a6',
 }
 
 const TYPE_BADGE: Record<string, string> = {
@@ -174,9 +67,45 @@ function formatLabel(type: string): string {
   return type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
+function createColoredIcon(type: ProjectType): L.DivIcon {
+  const color = TYPE_COLORS[type] || '#22c55e'
+  return L.divIcon({
+    className: '',
+    html: `<div style="width: 20px; height: 20px; background: ${color}; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+    popupAnchor: [0, -10],
+  })
+}
+
+function createSelectedIcon(type: ProjectType): L.DivIcon {
+  const color = TYPE_COLORS[type] || '#22c55e'
+  return L.divIcon({
+    className: '',
+    html: `<div style="width: 28px; height: 28px; background: ${color}; border: 4px solid #166534; border-radius: 50%; box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.3);"></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14],
+  })
+}
+
+function FitBounds({ projects, selected }: { projects: Project[]; selected: Project | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (selected) {
+      map.setView([selected.lat, selected.lng], 8, { animate: true })
+    } else if (projects.length > 0) {
+      const bounds = L.latLngBounds(projects.map(p => [p.lat, p.lng] as [number, number]))
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 })
+    }
+  }, [projects, selected, map])
+  return null
+}
+
 export default function App() {
   const [activeFilter, setActiveFilter] = useState<ProjectType | 'all'>('all')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const mapRef = useRef<L.Map | null>(null)
 
   const filtered = activeFilter === 'all'
     ? PROJECTS
@@ -209,38 +138,46 @@ export default function App() {
         </section>
 
         <section className="flex gap-4 flex-col lg:flex-row">
-          <div className="relative w-full lg:flex-1 h-[600px] rounded-xl border border-slate-300 overflow-hidden bg-gradient-to-br from-green-200 via-green-300 to-blue-300 shadow-inner">
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage:
-                  'linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)',
-                backgroundSize: '40px 40px',
-              }}
-            />
-
-            {filtered.map(proj => (
-              <button
-                key={proj.id}
-                onClick={() => setSelectedProject(proj)}
-                title={proj.name}
-                className={`absolute transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer z-10 transition-transform hover:scale-125 ${
-                  selectedProject?.id === proj.id ? 'scale-125 ring-2 ring-white ring-offset-2' : ''
-                }`}
-                style={{ left: `${proj.x}%`, top: `${proj.y}%` }}
-              >
-                <span className={`block w-5 h-5 rounded-full shadow-md ${TYPE_COLORS[proj.type]}`} />
-                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-0.5 bg-slate-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow">
-                  {proj.name}
-                </span>
-              </button>
-            ))}
-
-            {filtered.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-lg">
-                No projects match this filter
-              </div>
-            )}
+          <div className="w-full lg:flex-1 h-[550px] rounded-xl border border-slate-300 overflow-hidden shadow-inner z-0">
+            <MapContainer
+              center={[-1.5, 35.5]}
+              zoom={6}
+              className="h-full w-full"
+              scrollWheelZoom={true}
+              ref={mapRef as any}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <FitBounds projects={filtered} selected={selectedProject} />
+              {filtered.map(proj => (
+                <Marker
+                  key={proj.id}
+                  position={[proj.lat, proj.lng]}
+                  icon={selectedProject?.id === proj.id ? createSelectedIcon(proj.type) : createColoredIcon(proj.type)}
+                  eventHandlers={{
+                    click: () => setSelectedProject(proj),
+                  }}
+                >
+                  <Popup>
+                    <div className="text-sm">
+                      <p className="font-bold text-slate-800">{proj.name}</p>
+                      <p className="text-slate-500 text-xs mt-0.5">{proj.location}</p>
+                      <div className="flex gap-2 mt-1">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[proj.type]}`}>
+                          {formatLabel(proj.type)}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[proj.status]}`}>
+                          {proj.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1">{proj.area.toLocaleString()} ha · {proj.carbonRate} tCO₂e/ha/yr</p>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
           </div>
 
           {selectedProject && (
@@ -278,6 +215,10 @@ export default function App() {
               </div>
 
               <p className="text-sm text-slate-600 leading-relaxed">{selectedProject.description}</p>
+
+              <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-400">
+                Coordinates: {selectedProject.lat.toFixed(4)}, {selectedProject.lng.toFixed(4)}
+              </div>
             </aside>
           )}
         </section>
@@ -295,7 +236,7 @@ export default function App() {
                   selectedProject?.id === proj.id ? 'bg-brand-green-50 border-l-4 border-brand-green-600' : ''
                 }`}
               >
-                <span className={`w-3 h-3 rounded-full shrink-0 ${TYPE_COLORS[proj.type]}`} />
+                <span className={`w-3 h-3 rounded-full shrink-0`} style={{ backgroundColor: TYPE_COLORS[proj.type] }} />
                 <span className="flex-1 font-medium text-sm text-slate-800">{proj.name}</span>
                 <span className="text-xs text-slate-400 hidden sm:inline">{proj.location}</span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[proj.type]}`}>
@@ -310,7 +251,7 @@ export default function App() {
         </section>
 
         <footer className="text-center text-xs text-slate-400 py-4">
-          Wajibika Mazingira — Conservation Map
+          Wajibika Mazingira — Conservation Map &middot; Data &copy; OpenStreetMap contributors
         </footer>
       </main>
     </div>

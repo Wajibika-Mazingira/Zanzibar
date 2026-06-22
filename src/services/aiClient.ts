@@ -1,4 +1,4 @@
-import { getProvider } from '../contexts/AiProviderContext';
+import { getProvider } from '../contexts/aiProviderLib';
 import type { AiMessage, AiStreamOptions } from './aiProvider';
 
 export type ChatMode = 'fast' | 'smart' | 'grounded' | 'maps';
@@ -12,25 +12,20 @@ const MODE_STREAM_OPTIONS: Record<ChatMode, AiStreamOptions> = {
 
 export const streamAIResponse = async (
   task: string,
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
 ): Promise<ReadableStream<Uint8Array>> => {
   const provider = getProvider();
 
   switch (task) {
     case 'chat':
     case 'complexGeneration': {
-      const { messages, model, systemInstruction, mode } = payload;
-      const options = mode ? MODE_STREAM_OPTIONS[mode as ChatMode] : undefined;
-      return provider.streamChat(
-        messages as AiMessage[],
-        systemInstruction as string | undefined,
-        model as string | undefined,
-        options,
-      );
+      const p = payload as { messages: AiMessage[]; model?: string; systemInstruction?: string; mode?: string };
+      const options = p.mode ? MODE_STREAM_OPTIONS[p.mode as ChatMode] : undefined;
+      return provider.streamChat(p.messages, p.systemInstruction, p.model, options);
     }
     case 'analyzeImage': {
-      const { prompt, image, mimeType, model } = payload;
-      return provider.streamImageAnalysis({ prompt, image, mimeType, model });
+      const p = payload as { prompt: string; image: string; mimeType: string; model?: string };
+      return provider.streamImageAnalysis(p);
     }
     default:
       throw new Error(`Unsupported streaming task: ${task}`);
@@ -39,20 +34,14 @@ export const streamAIResponse = async (
 
 export const generateAIResponse = async (
   task: string,
-  payload: Record<string, any>,
-): Promise<{ text: string; sources?: any[] }> => {
+  payload: Record<string, unknown>,
+): Promise<{ text: string; sources?: Record<string, unknown>[] }> => {
   const provider = getProvider();
 
   switch (task) {
-    case 'groundedSearch':
-    case 'groundedMaps':
     case 'chat': {
-      const { messages, model, systemInstruction } = payload;
-      return provider.generateChat(
-        messages as AiMessage[],
-        systemInstruction as string | undefined,
-        model as string | undefined,
-      );
+      const p = payload as { messages: AiMessage[]; model?: string; systemInstruction?: string };
+      return provider.generateChat(p.messages, p.systemInstruction, p.model);
     }
     default:
       throw new Error(`Unsupported non-streaming task: ${task}`);

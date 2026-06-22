@@ -1,6 +1,6 @@
 import * as React from 'react';
 import type { Page } from '../types';
-import { useAiProvider } from '../contexts/AiProviderContext';
+import { useAiProvider } from '../contexts/aiProviderLib';
 const AiConfigPanel = React.lazy(() => import('./AiConfigPanel').then(m => ({ default: m.AiConfigPanel })));
 import { useI18n } from '../config/i18n';
 
@@ -81,7 +81,12 @@ const primaryNav: { labelKey: string; page: Page; Icon: React.ElementType }[] = 
   { labelKey: 'nav.governance', page: 'governance', Icon: GovIcon },
 ];
 
+const WalletIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" /></svg>
+);
+
 const moreNav: { labelKey: string; page: Page; Icon: React.ElementType }[] = [
+  { labelKey: 'nav.wallet', page: 'wallet', Icon: WalletIcon },
   { labelKey: 'nav.zanzibar', page: 'zanzibar', Icon: ZanzibarIcon },
   { labelKey: 'nav.chat', page: 'chat', Icon: ChatBubbleIcon },
   { labelKey: 'nav.locker', page: 'locker', Icon: LockerIcon },
@@ -125,30 +130,34 @@ export const Header: React.FC<HeaderProps> = ({ activePage, setActivePage }) => 
 
   // Prefetch likely page bundles on hover/touch to improve perceived navigation speed
   const prefetchPage = (page: Page) => {
+    const p = () => {};
     switch (page) {
       case 'passport':
-        import('./CarbonPassport');
+        import('./CarbonPassport').catch(p);
         break;
       case 'assessment':
-        import('./AssessmentGenerator');
+        import('./AssessmentGenerator').catch(p);
         break;
       case 'chat':
-        import('./CommunityChat');
+        import('./CommunityChat').catch(p);
         break;
       case 'locker':
-        import('./EvidenceLocker');
+        import('./EvidenceLocker').catch(p);
         break;
       case 'carbon':
-        import('./CarbonDashboard');
+        import('./CarbonDashboard').catch(p);
         break;
       case 'market':
-        import('./CarbonMarket');
+        import('./CarbonMarket').catch(p);
         break;
       case 'governance':
-        import('./GovernancePortal');
+        import('./GovernancePortal').catch(p);
         break;
       case 'zanzibar':
-        import('./ZanzibarShowcase');
+        import('./ZanzibarShowcase').catch(p);
+        break;
+      case 'wallet':
+        import('./CarbonWallet').catch(p);
         break;
       default:
         break;
@@ -221,7 +230,7 @@ export const Header: React.FC<HeaderProps> = ({ activePage, setActivePage }) => 
                <AiIcon className="h-6 w-6 transition-transform group-hover:scale-110" />
              </button>
              {/* Mobile Menu Toggle */}
-             <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="xl:hidden p-2.5 text-white hover:bg-white/15 backdrop-blur-sm transition-all duration-300 rounded-lg shadow-md group" aria-label="Toggle navigation menu">
+              <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="xl:hidden p-2.5 text-white hover:bg-white/15 backdrop-blur-sm transition-all duration-300 rounded-lg shadow-md group min-h-[44px] min-w-[44px] items-center justify-center flex" aria-label="Toggle navigation menu" aria-expanded={showMobileMenu}>
                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showMobileMenu ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} /></svg>
              </button>
           </div>

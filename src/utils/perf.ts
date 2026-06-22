@@ -1,4 +1,3 @@
-// Small performance instrumentation for CI / local profiling
 export function startPerfReporting() {
   try {
     const perf: Record<string, number> = {};
@@ -13,31 +12,36 @@ export function startPerfReporting() {
           }
         });
         po.observe({ type: 'paint', buffered: true });
-      } catch {}
+      } catch {
+        // PerformanceObserver not available for paint
+      }
 
       try {
         const po2 = new PerformanceObserver((list) => {
           for (const entry of list.getEntries()) {
-            perf.lcp = Math.round((entry as any).renderTime || entry.startTime);
+            const e = entry as PerformanceEntry & { renderTime?: number };
+            perf.lcp = Math.round(e.renderTime || e.startTime);
           }
         });
-        // @ts-ignore - LCP type may not be recognized in older TS libs
         po2.observe({ type: 'largest-contentful-paint', buffered: true });
-      } catch {}
+      } catch {
+        // PerformanceObserver not available for LCP
+      }
     }
 
-    // Expose for tests / CI to read after load
-    (window as any).__perfMetrics = perf;
+    (window as Window & { __perfMetrics?: Record<string, number> }).__perfMetrics = perf;
 
-    // Dump after load
     window.addEventListener('load', () => {
       setTimeout(() => {
         try {
-          console.info('[perf] metrics', (window as any).__perfMetrics || perf);
-        } catch {}
+          const w = window as Window & { __perfMetrics?: Record<string, number> };
+          console.info('[perf] metrics', w.__perfMetrics || perf);
+        } catch {
+          // console may not be available
+        }
       }, 2000);
     });
-  } catch (e) {
-    // noop
+  } catch {
+    // Performance API not available
   }
 }

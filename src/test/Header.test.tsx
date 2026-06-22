@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Header } from '../components/Header';
-import { ToastsProvider } from '../hooks/useToasts';
+import { ToastsProvider } from '../components/ToastsProvider';
 import { AiProviderContext } from '../contexts/AiProviderContext';
 import { I18nProvider } from '../config/i18n';
 

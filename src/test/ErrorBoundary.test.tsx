@@ -35,7 +35,7 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-    expect(screen.getByText('Test error message')).toBeInTheDocument();
+    expect(screen.getByText(/Test error message/)).toBeInTheDocument();
   });
 
   it('provides a "Try Again" button that resets the boundary', async () => {

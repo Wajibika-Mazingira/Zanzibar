@@ -5,7 +5,7 @@ import type { AssessmentType } from '../types';
 const baseDetails = {
   projectName: 'Solar Farm Alpha',
   projectProponent: 'Green Energy Ltd',
-  location: 'Nairobi',
+  location: 'Zanzibar City',
   projectType: 'Renewable Energy',
   description: 'A 50MW solar farm on 200 acres.',
   assessmentType: 'Environmental' as AssessmentType,
@@ -27,7 +27,7 @@ describe('getSectionPrompt', () => {
     const prompt = getSectionPrompt(baseDetails, '1.0 Introduction');
     expect(prompt).toContain('Solar Farm Alpha');
     expect(prompt).toContain('Green Energy Ltd');
-    expect(prompt).toContain('Nairobi');
+    expect(prompt).toContain('Zanzibar City');
     expect(prompt).toContain('Renewable Energy');
     expect(prompt).toContain('A 50MW solar farm on 200 acres.');
   });
@@ -83,9 +83,9 @@ describe('getSectionPrompt', () => {
     expect(prompt).toContain('Additive & Synergistic');
   });
 
-  it('includes Kenya in the location context', () => {
+  it('includes Zanzibar in the location context', () => {
     const prompt = getSectionPrompt(baseDetails, '1.0 Introduction');
-    expect(prompt).toContain('Kenya');
+    expect(prompt).toContain('Zanzibar');
   });
 
   it('includes Markdown formatting instructions', () => {

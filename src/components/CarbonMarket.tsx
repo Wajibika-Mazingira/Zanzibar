@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { Card } from './common/Card';
 import { LoadingSpinner } from './common/LoadingSpinner';
+import { EmptyState } from './common/EmptyState';
+import { ExpandableContent } from './common/ExpandableContent';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToasts } from '../hooks/useToasts';
 import { useStreamReader } from '../hooks/useStreamReader';
@@ -43,18 +45,33 @@ function matchOrders(
   );
 }
 
+interface MarketTx {
+  id: string; type: 'send' | 'receive'; counterparty: string;
+  amount: number; date: string; status: 'Completed' | 'Pending' | 'Failed';
+  project?: string; memo?: string; orderId?: string;
+}
+
 export const CarbonMarket: React.FC = () => {
   const [credits, setCredits] = useLocalStorage<CarbonCredit[]>('carbonCredits', []);
   const [orders, setOrders] = useLocalStorage<MarketOrder[]>('marketOrders', []);
   const [priceHistory, setPriceHistory] = useLocalStorage<CarbonPricePoint[]>('carbonPriceHistory', genPriceHistory());
-  const [activeTab, setActiveTab] = React.useState<'market' | 'orders'>('market');
-  const [orderType, setOrderType] = React.useState<'buy' | 'sell'>('buy');
-  const [orderPrice, setOrderPrice] = React.useState(12.50);
-  const [orderTonnes, setOrderTonnes] = React.useState(10);
-  const [orderProjectType, setOrderProjectType] = React.useState<CarbonProjectType | ''>('');
-  const [selectedCredit, setSelectedCredit] = React.useState('');
-  const [showOrderForm, setShowOrderForm] = React.useState(false);
-  const [aiInsight, setAiInsight] = React.useState<string | null>(null);
+  const [, setMarketTxs] = useLocalStorage<MarketTx[]>('carbonTransactions', []);
+  // Ensure price history is never empty on first render
+  React.useEffect(() => {
+    if (priceHistory.length === 0) {
+      setPriceHistory(genPriceHistory());
+    }
+  }, [priceHistory.length, setPriceHistory]);
+
+  const [activeTab, setActiveTab] = useLocalStorage<'market' | 'orders'>('carbonMarketActiveTab', 'market');
+  const [orderType, setOrderType] = useLocalStorage<'buy' | 'sell'>('carbonMarketOrderType', 'buy');
+  const [orderPrice, setOrderPrice] = useLocalStorage('carbonMarketOrderPrice', 12.50);
+  const [orderTonnes, setOrderTonnes] = useLocalStorage('carbonMarketOrderTonnes', 10);
+  const [orderProjectType, setOrderProjectType] = useLocalStorage<CarbonProjectType | ''>('carbonMarketOrderProjectType', '');
+  const [selectedCredit, setSelectedCredit] = useLocalStorage('carbonMarketSelectedCredit', '');
+  const [showOrderForm, setShowOrderForm] = useLocalStorage('carbonMarketShowOrderForm', false);
+  const [aiInsight, setAiInsight] = useLocalStorage<string | null>('carbonMarketAiInsight', null);
+  const [aiInsightError, setAiInsightError] = React.useState<string | null>(null);
   const [isLoadingInsight, setIsLoadingInsight] = React.useState(false);
   const { addToast } = useToasts();
   const { t, language } = useI18n();
@@ -150,9 +167,28 @@ export const CarbonMarket: React.FC = () => {
       }
 
       const filled = orderTonnes - remaining;
+      if (filled > 0) {
+        const now = new Date().toISOString().slice(0, 10);
+        const projectTypeLabel = orderProjectType ? orderProjectType.replace('_', ' ') : 'Carbon Credit';
+        const txId = `MKTX-${Date.now().toString(36).toUpperCase()}`;
+        setMarketTxs(prev => [
+          { id: txId + '-B', type: 'receive', counterparty: 'Market Seller', amount: filled, date: now, status: 'Completed', project: projectTypeLabel, memo: 'Bought on market', orderId: newOrder.id },
+          { id: txId + '-S', type: 'send', counterparty: 'Market Buyer', amount: filled, date: now, status: 'Completed', project: projectTypeLabel, memo: 'Sold on market', orderId: newOrder.id },
+          ...prev,
+        ]);
+      }
+
       addToast({ type: 'success', message: `${orderType === 'buy' ? 'Buy' : 'Sell'} order placed${filled > 0 ? `. ${filled} tCO₂ matched instantly!` : ''}` });
     } else {
       setOrders(prev => [newOrder, ...prev]);
+      const projectTypeLabel = orderProjectType ? orderProjectType.replace('_', ' ') : 'Carbon Credit';
+      setMarketTxs(prev => [{
+        id: `MKTX-${Date.now().toString(36).toUpperCase()}-P`,
+        type: orderType === 'buy' ? 'receive' : 'send',
+        counterparty: orderType === 'buy' ? 'Pending Seller' : 'Pending Buyer',
+        amount: orderTonnes, date: new Date().toISOString().slice(0, 10),
+        status: 'Pending', project: projectTypeLabel, orderId: newOrder.id,
+      }, ...prev]);
       addToast({ type: 'info', message: `${orderType === 'buy' ? 'Buy' : 'Sell'} order placed on order book.` });
     }
 
@@ -195,6 +231,8 @@ export const CarbonMarket: React.FC = () => {
 
   const getAiMarketInsight = async () => {
     setIsLoadingInsight(true);
+    setAiInsightError(null);
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     try {
       const recentPrices = priceHistory.slice(-12);
       const prompt = `Analyze the current carbon credit market:\n\nCurrent Average Price: $${averagePrice}\n24h Price Change: ${priceChange}%\nAvailable Credits: ${availableCredits.length} (${availableVolume} tCO₂)\nBuy Orders: ${openBuyOrders.length} (${totalOpenBuyVolume} tCO₂ demand)\nSell Orders: ${openSellOrders.length} (${totalOpenSellVolume} tCO₂ supply)\n\nRecent Prices (last 12h):\n${recentPrices.map(p => `  ${new Date(p.timestamp).toLocaleTimeString()}: $${p.price.toFixed(2)} (${p.volume}t)`).join('\n')}\n\nAvailable by type:\n${projectTypes.map(pt => { const count = availableCredits.filter(c => c.projectType === pt.value).length; return count > 0 ? `  ${pt.icon} ${pt.label}: ${count}` : null; }).filter(Boolean).join('\n')}\n\nProvide: 1. Market trend analysis 2. Price prediction for 24h 3. Recommended bid/ask strategy 4. Supply/demand observations 5. Fair value estimate by type`;
@@ -204,16 +242,16 @@ export const CarbonMarket: React.FC = () => {
         systemInstruction: withLanguage(CARBON_EXPERT_INSTRUCTION, language),
       });
       let fullText = '';
-      let timeoutId: ReturnType<typeof setTimeout> | null = null;
       await readStream(stream, chunk => {
         fullText += chunk;
         if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout(() => setAiInsight(fullText), 50);
-      });
+      }, undefined, { streamTimeout: 45000, totalTimeout: 180000 });
       if (timeoutId) clearTimeout(timeoutId);
       setAiInsight(fullText);
-    } catch {
-      addToast({ type: 'error', message: 'Failed to get market insight.' });
+    } catch (e) {
+      if (timeoutId) clearTimeout(timeoutId);
+      setAiInsightError(e instanceof Error ? e.message : 'Failed to get market insight.');
     } finally {
       setIsLoadingInsight(false);
     }
@@ -242,11 +280,11 @@ export const CarbonMarket: React.FC = () => {
         <div className="lg:col-span-2">
           <Card>
             <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-              <div className="flex gap-2" role="tablist">
-                <button role="tab" aria-selected={activeTab === 'market'} onClick={() => setActiveTab('market')}
-                  className={`px-3 py-1 text-sm font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-green-500 ${activeTab === 'market' ? 'bg-brand-green-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{t('market.orderBook')}</button>
-                <button role="tab" aria-selected={activeTab === 'orders'} onClick={() => setActiveTab('orders')}
-                  className={`px-3 py-1 text-sm font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-green-500 ${activeTab === 'orders' ? 'bg-brand-green-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{t('market.myOrders')}</button>
+              <div className="flex gap-2" role="tablist" aria-label="Market views">
+                <button role="tab" id="tab-market" aria-selected={activeTab === 'market'} aria-controls="tabpanel-market" onClick={() => setActiveTab('market')}
+                  className={`px-3 py-1 text-sm font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[36px] ${activeTab === 'market' ? 'bg-brand-green-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{t('market.orderBook')}</button>
+                <button role="tab" id="tab-orders" aria-selected={activeTab === 'orders'} aria-controls="tabpanel-orders" onClick={() => setActiveTab('orders')}
+                  className={`px-3 py-1 text-sm font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[36px] ${activeTab === 'orders' ? 'bg-brand-green-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{t('market.myOrders')}</button>
               </div>
               <button onClick={() => setShowOrderForm(!showOrderForm)}
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-green-600 text-white hover:bg-brand-green-700 focus:outline-none focus:ring-2 focus:ring-brand-green-500">
@@ -305,10 +343,16 @@ export const CarbonMarket: React.FC = () => {
             )}
 
             {activeTab === 'market' ? (
-              <div className="divide-y divide-slate-100 max-h-[50vh] overflow-y-auto">
+              <div id="tabpanel-market" role="tabpanel" aria-labelledby="tab-market" className="divide-y divide-slate-100 max-h-[50vh] overflow-y-auto">
                 <div className="p-3">
                   <h4 className="text-xs font-bold text-red-600 mb-2 uppercase tracking-wider">{t('market.sellOrders')}</h4>
-                  {openSellOrders.length === 0 ? <p className="text-xs text-slate-400 text-center py-4" role="status">{t('market.noSellOrders')}</p> : (
+                  {openSellOrders.length === 0 ? (
+                    <EmptyState
+                      title={t('market.noSellOrders')}
+                      description="No sell orders currently on the order book."
+                      className="py-6"
+                    />
+                  ) : (
                     <div className="space-y-1" role="list">{openSellOrders.slice(0, 15).map(o => (
                       <div key={o.id} className="flex justify-between items-center p-2 bg-red-50 rounded text-sm">
                         <div><span className="font-semibold text-slate-700">${o.pricePerTonne.toFixed(2)}</span><span className="text-xs text-slate-500 ml-2">{o.tonnes - o.filledTonnes} t</span></div>
@@ -319,7 +363,13 @@ export const CarbonMarket: React.FC = () => {
                 </div>
                 <div className="p-3">
                   <h4 className="text-xs font-bold text-green-600 mb-2 uppercase tracking-wider">{t('market.buyOrders')}</h4>
-                  {openBuyOrders.length === 0 ? <p className="text-xs text-slate-400 text-center py-4" role="status">{t('market.noBuyOrders')}</p> : (
+                  {openBuyOrders.length === 0 ? (
+                    <EmptyState
+                      title={t('market.noBuyOrders')}
+                      description="No buy orders currently on the order book."
+                      className="py-6"
+                    />
+                  ) : (
                     <div className="space-y-1" role="list">{openBuyOrders.slice(0, 15).map(o => (
                       <div key={o.id} className="flex justify-between items-center p-2 bg-green-50 rounded text-sm">
                         <div><span className="font-semibold text-slate-700">${o.pricePerTonne.toFixed(2)}</span><span className="text-xs text-slate-500 ml-2">{o.tonnes - o.filledTonnes} t</span></div>
@@ -330,7 +380,13 @@ export const CarbonMarket: React.FC = () => {
                 </div>
                 <div className="p-3">
                   <h4 className="text-xs font-bold text-blue-600 mb-2 uppercase tracking-wider">{t('market.availableForSale')}</h4>
-                  {availableCredits.length === 0 ? <p className="text-xs text-slate-400 text-center py-4" role="status">{t('market.noCreditsForSale')}</p> : (
+                  {availableCredits.length === 0 ? (
+                    <EmptyState
+                      title={t('market.noCreditsForSale')}
+                      description="No carbon credits currently available for sale."
+                      className="py-6"
+                    />
+                  ) : (
                     <div className="space-y-1" role="list">{availableCredits.slice(0, 10).map(c => (
                       <div key={c.id} className="flex justify-between items-center p-2 bg-blue-50 rounded text-sm">
                         <div className="min-w-0">
@@ -347,13 +403,15 @@ export const CarbonMarket: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="max-h-[50vh] overflow-y-auto divide-y divide-slate-100">
+              <div id="tabpanel-orders" role="tabpanel" aria-labelledby="tab-orders" className="max-h-[50vh] overflow-y-auto divide-y divide-slate-100">
                 {nonCancelledOrders.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-slate-500" role="status">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto mb-2 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75H17.25m-7.5 3h9" /></svg>
-                    <p className="font-semibold">{t('market.noOrders')}</p>
-                    <p className="text-xs mt-1">{t('market.noOrders.desc')}</p>
-                  </div>
+                  <EmptyState
+                    icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75H17.25m-7.5 3h9" /></svg>}
+                    title={t('market.noOrders')}
+                    description={t('market.noOrders.desc')}
+                    actionLabel={t('market.placeOrder')}
+                    onAction={() => setShowOrderForm(true)}
+                  />
                 ) : nonCancelledOrders.map(o => (
                   <div key={o.id} className="p-3 flex justify-between items-center">
                     <div className="min-w-0">
@@ -413,8 +471,15 @@ export const CarbonMarket: React.FC = () => {
             <div className="p-3 max-h-48 overflow-y-auto text-sm text-slate-600" role="status" aria-live="polite">
               {isLoadingInsight ? (
                 <LoadingSpinner size="sm" message="Analyzing market..." />
+              ) : aiInsightError ? (
+                <div className="p-3 bg-red-50 rounded-lg">
+                  <p className="text-red-700 text-sm">{aiInsightError}</p>
+                  <button onClick={getAiMarketInsight} className="mt-2 text-xs font-semibold text-brand-green-600 hover:text-brand-green-800 focus:outline-none focus:ring-2 focus:ring-brand-green-500 rounded min-h-[32px]">
+                    {t('common.retry') || 'Retry'}
+                  </button>
+                </div>
               ) : aiInsight ? (
-                <p>{aiInsight.slice(0, 600)}{aiInsight.length > 600 ? <span className="text-xs text-slate-400">...</span> : ''}</p>
+                <ExpandableContent content={aiInsight} maxLength={600} />
               ) : (
                 <p className="text-slate-400 italic">{t('market.insight.empty')}</p>
               )}

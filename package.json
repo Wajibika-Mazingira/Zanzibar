@@ -15,6 +15,7 @@
   "scripts": {
     "dev": "vite",
     "dev:all": "concurrently -n main,dev,maps,wallet,reporter -c green,blue,yellow,magenta,cyan \"npm run dev\" \"npm run dev --workspace=@wajibika/land-developer\" \"npm run dev --workspace=@wajibika/conservation-map\" \"npm run dev --workspace=@wajibika/carbon-wallet\" \"npm run dev --workspace=@wajibika/community-reporter\"",
+    "predev:all": "lsof -ti :5173-5177 2>/dev/null | xargs -r kill 2>/dev/null; echo 'cleaned ports 5173-5177'",
     "build": "vite build && node -e \"require('fs').copyFileSync('dist/index.html','dist/404.html')\"",
     "build:all": "npm run build --workspaces --if-present",
     "preview": "vite preview",

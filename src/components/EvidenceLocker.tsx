@@ -9,7 +9,7 @@ const EvidenceReportViewer = React.lazy(() => import('./EvidenceReportViewer'));
 const EvidenceListPanel = React.lazy(() => import('./EvidenceListPanel').then(m => ({ default: m.default })));
 import { useToasts } from '../hooks/useToasts';
 import { useStreamReader } from '../hooks/useStreamReader';
-// exportToPdf, streamAIResponse and PiPaymentButton are lazy-loaded to reduce initial bundle
+
 import { MODELS } from '../config/ai';
 import { MAX_IMAGE_SIZE_BYTES, MAX_IMAGE_SIZE_LABEL } from '../utils/sanitize';
 import ExportPdfButton from './ExportPdfButton';
@@ -29,10 +29,17 @@ export const EvidenceLocker: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   
-  React.useEffect(() => {
+  const [editingResetKey, setEditingResetKey] = React.useState(selectedAssessment?.id);
+  if (selectedAssessment?.id !== editingResetKey) {
+    setEditingResetKey(selectedAssessment?.id);
     setIsEditing(false);
     setEditedReport('');
-  }, [selectedAssessment?.id]);
+  }
+
+  const assessmentsRef = React.useRef(assessments);
+  React.useEffect(() => {
+    assessmentsRef.current = assessments;
+  }, [assessments]);
 
   const filteredAssessments = React.useMemo(() => {
     if (activeTab === 'all') return assessments;
@@ -100,11 +107,12 @@ export const EvidenceLocker: React.FC = () => {
 
      updateEvidenceState(evidenceId, { isAnalyzing: true, analysis: '' });
      
+     let timeoutId: ReturnType<typeof setTimeout> | null = null;
      try {
          const base64Data = evidenceToAnalyze.data.split(',')[1];
          const mimeType = evidenceToAnalyze.data.split(';')[0].split(':')[1];
          const langInstr = language === 'sw' ? 'Respond in Swahili (Kiswahili).' : 'Respond in English.';
-         const prompt = `Analyze this image in the context of a potential environmental or social impact assessment in Kenya. Describe what you see and identify any potential points of concern. Be objective and descriptive. ${langInstr}`;
+         const prompt = `Analyze this image in the context of a potential environmental or social impact assessment in Zanzibar. Describe what you see and identify any potential points of concern. Be objective and descriptive. ${langInstr}`;
          
           const { streamAIResponse } = await import('../services/aiClient');
           const stream = await streamAIResponse('analyzeImage', {
@@ -115,32 +123,45 @@ export const EvidenceLocker: React.FC = () => {
           });
          
          let fullText = '';
-         let timeoutId: ReturnType<typeof setTimeout> | null = null;
          await readStream(stream, chunk => {
              fullText += chunk;
-             if (timeoutId) clearTimeout(timeoutId);
-             timeoutId = setTimeout(() => {
-                 const newAssessments = assessments.map(a => a.id === selectedAssessment.id ? {
-                     ...a,
-                     evidence: a.evidence?.map(e => e.id === evidenceId ? {...e, analysis: fullText} : e)
-                 } : a);
-                 setAssessments(newAssessments);
-                 setSelectedAssessment(newAssessments.find(a => a.id === selectedAssessment.id) || null);
-             }, 50);
-         });
-         if (timeoutId) clearTimeout(timeoutId);
-         const finalAssessments = assessments.map(a => a.id === selectedAssessment.id ? {
-             ...a,
-             evidence: a.evidence?.map(e => e.id === evidenceId ? {...e, analysis: fullText} : e)
-         } : a);
-         setAssessments(finalAssessments);
-         setSelectedAssessment(finalAssessments.find(a => a.id === selectedAssessment.id) || null);
-     } catch (error) {
-         addToast({ type: 'error', message: 'Image analysis failed.' });
-         updateEvidenceState(evidenceId, { analysis: 'Error during analysis.' });
-     } finally {
-         updateEvidenceState(evidenceId, { isAnalyzing: false });
-     }
+          if (timeoutId) clearTimeout(timeoutId);
+              timeoutId = setTimeout(() => {
+                  const latestAssessments = assessmentsRef.current;
+                  const analyzedId = selectedAssessment.id;
+                  const newAssessments = latestAssessments.map(a => a.id === analyzedId ? {
+                      ...a,
+                      evidence: a.evidence?.map(e => e.id === evidenceId ? {...e, analysis: fullText} : e)
+                  } : a);
+                  setAssessments(newAssessments);
+                  // Only overwrite selection if user is still viewing the same assessment
+                  setSelectedAssessment(prev => {
+                      if (prev?.id === analyzedId) {
+                          return newAssessments.find(a => a.id === analyzedId) || null;
+                      }
+                      return prev;
+                  });
+              }, 50);
+         }, undefined, { streamTimeout: 45000, totalTimeout: 180000 });
+          if (timeoutId) clearTimeout(timeoutId);
+          const latestAssessments = assessmentsRef.current;
+          const analyzedId = selectedAssessment.id;
+          const finalAssessments = latestAssessments.map(a => a.id === analyzedId ? {
+              ...a,
+              evidence: a.evidence?.map(e => e.id === evidenceId ? {...e, analysis: fullText, isAnalyzing: false} : e)
+          } : a);
+          setAssessments(finalAssessments);
+          setSelectedAssessment(prev => {
+              if (prev?.id === analyzedId) {
+                  return finalAssessments.find(a => a.id === analyzedId) || null;
+              }
+              return prev;
+          });
+      } catch {
+          if (timeoutId) clearTimeout(timeoutId);
+          addToast({ type: 'error', message: 'Image analysis failed.' });
+          updateEvidenceState(evidenceId, { analysis: 'Error during analysis.', isAnalyzing: false });
+      }
   };
 
   const handleRemoveEvidence = (evidenceId: string) => {
@@ -209,20 +230,22 @@ export const EvidenceLocker: React.FC = () => {
                 {filteredAssessments.length}
               </span>
             </div>
-            <div className="p-2 border-b border-slate-200 flex flex-wrap gap-1">
-              <button onClick={() => setActiveTab('all')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'all' ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{t('locker.all')}</button>
-              <button onClick={() => setActiveTab('environmental')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'environmental' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{t('locker.environmental')}</button>
-              <button onClick={() => setActiveTab('social')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'social' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>{t('locker.social')}</button>
-              <button onClick={() => setActiveTab('health')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'health' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}>{t('locker.health')}</button>
-              <button onClick={() => setActiveTab('climate')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'climate' ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'}`}>{t('locker.climate')}</button>
-              <button onClick={() => setActiveTab('carbon')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'carbon' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>{t('locker.carbon')}</button>
-              <button onClick={() => setActiveTab('monitoring')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'monitoring' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}>{t('locker.monitoring')}</button>
-              <button onClick={() => setActiveTab('engagement')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'engagement' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}>{t('locker.engagement')}</button>
-              <button onClick={() => setActiveTab('compliance')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'compliance' ? 'bg-orange-600 text-white' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}>{t('locker.compliance')}</button>
-              <button onClick={() => setActiveTab('financial')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'financial' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>{t('locker.financial')}</button>
-              <button onClick={() => setActiveTab('risk')} className={`px-2 py-1 text-xs rounded-full ${activeTab === 'risk' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>{t('locker.risk')}</button>
+            <div className="p-2 border-b border-slate-200 overflow-x-auto" role="tablist" aria-label="Assessment type filter">
+              <div className="flex gap-1 min-w-max">
+              <button role="tab" aria-selected={activeTab === 'all'} id="el-tab-all" aria-controls="el-panel-all" onClick={() => setActiveTab('all')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'all' ? 'bg-brand-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{t('locker.all')}</button>
+              <button role="tab" aria-selected={activeTab === 'environmental'} id="el-tab-env" aria-controls="el-panel-env" onClick={() => setActiveTab('environmental')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'environmental' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{t('locker.environmental')}</button>
+              <button role="tab" aria-selected={activeTab === 'social'} id="el-tab-social" aria-controls="el-panel-social" onClick={() => setActiveTab('social')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'social' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>{t('locker.social')}</button>
+              <button role="tab" aria-selected={activeTab === 'health'} id="el-tab-health" aria-controls="el-panel-health" onClick={() => setActiveTab('health')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'health' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}>{t('locker.health')}</button>
+              <button role="tab" aria-selected={activeTab === 'climate'} id="el-tab-climate" aria-controls="el-panel-climate" onClick={() => setActiveTab('climate')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'climate' ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'}`}>{t('locker.climate')}</button>
+              <button role="tab" aria-selected={activeTab === 'carbon'} id="el-tab-carbon" aria-controls="el-panel-carbon" onClick={() => setActiveTab('carbon')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'carbon' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>{t('locker.carbon')}</button>
+              <button role="tab" aria-selected={activeTab === 'monitoring'} id="el-tab-monitor" aria-controls="el-panel-monitor" onClick={() => setActiveTab('monitoring')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'monitoring' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}>{t('locker.monitoring')}</button>
+              <button role="tab" aria-selected={activeTab === 'engagement'} id="el-tab-engage" aria-controls="el-panel-engage" onClick={() => setActiveTab('engagement')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'engagement' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}>{t('locker.engagement')}</button>
+              <button role="tab" aria-selected={activeTab === 'compliance'} id="el-tab-comply" aria-controls="el-panel-comply" onClick={() => setActiveTab('compliance')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'compliance' ? 'bg-orange-600 text-white' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}>{t('locker.compliance')}</button>
+              <button role="tab" aria-selected={activeTab === 'financial'} id="el-tab-fin" aria-controls="el-panel-fin" onClick={() => setActiveTab('financial')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'financial' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>{t('locker.financial')}</button>
+              <button role="tab" aria-selected={activeTab === 'risk'} id="el-tab-risk" aria-controls="el-panel-risk" onClick={() => setActiveTab('risk')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'risk' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>{t('locker.risk')}</button>
+              </div>
             </div>
-            <div className="max-h-[40vh] md:max-h-[calc(100vh-10rem)] overflow-y-auto">
+            <div role="tabpanel" aria-label="Assessment list" className="max-h-[40vh] md:max-h-[calc(100vh-10rem)] overflow-y-auto">
               {filteredAssessments.length === 0 ? <p className="p-4 text-sm text-slate-500">{t('locker.noSaved')}</p> : (
                   <ul>{filteredAssessments.map(assessment => (
                       <li key={assessment.id} className={`border-b border-slate-200 last:border-b-0 ${selectedAssessment?.id === assessment.id ? 'bg-brand-green-50' : ''}`}>

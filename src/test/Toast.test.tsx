@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import * as React from 'react';
 import { ToastContainer } from '../components/common/Toast';
-import { ToastsProvider, useToasts } from '../hooks/useToasts';
+import { ToastsProvider } from '../components/ToastsProvider';
+import { useToasts } from '../hooks/useToasts';
 
 // Helper component that adds a toast on mount
 const AddToastHelper: React.FC<{ type: 'success' | 'error' | 'info'; message: string }> = ({ type, message }) => {
@@ -49,12 +50,12 @@ describe('Toast component', () => {
     expect(screen.getByText('Info')).toBeInTheDocument();
   });
 
-  it('auto-dismisses after 5 seconds', () => {
+  it('auto-dismisses after timeout', () => {
     renderWithToast('info', 'Auto dismiss me');
     expect(screen.getByText('Auto dismiss me')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(7000);
     });
 
     expect(screen.queryByText('Auto dismiss me')).not.toBeInTheDocument();

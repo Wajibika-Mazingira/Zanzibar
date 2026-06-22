@@ -1,6 +1,10 @@
 import * as React from 'react';
 import { Card } from './common/Card';
 import { LoadingSpinner } from './common/LoadingSpinner';
+import { EmptyState } from './common/EmptyState';
+import { ExpandableContent } from './common/ExpandableContent';
+import { FormField } from './common/FormField';
+import { useFieldErrors } from '../hooks/useFieldErrors';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToasts } from '../hooks/useToasts';
 import { useStreamReader } from '../hooks/useStreamReader';
@@ -86,11 +90,13 @@ export const GovernancePortal: React.FC = () => {
     ownedCredits: [], stakedCredits: [], totalSequestered: 0, totalRetired: 0, governanceTokens: 0,
   });
   const [projects] = useLocalStorage<CarbonProject[]>('carbonProjects', []);
-  const [showForm, setShowForm] = React.useState(false);
-  const [formData, setFormData] = React.useState({ title: '', description: '', category: 'other' as ProposalCategory });
-  const [selectedProposal, setSelectedProposal] = React.useState<Proposal | null>(null);
-  const [aiDebate, setAiDebate] = React.useState<string | null>(null);
+  const [showForm, setShowForm] = useLocalStorage('governanceShowForm', false);
+  const [formData, setFormData] = useLocalStorage('governanceFormData', { title: '', description: '', category: 'other' as ProposalCategory });
+  const [selectedProposal, setSelectedProposal] = useLocalStorage<Proposal | null>('governanceSelectedProposal', null);
+  const [aiDebate, setAiDebate] = useLocalStorage<string | null>('governanceAiDebate', null);
+  const [aiDebateError, setAiDebateError] = React.useState<string | null>(null);
   const [isLoadingDebate, setIsLoadingDebate] = React.useState(false);
+  const fieldErrors = useFieldErrors<{ title: string; description: string }>();
   const { addToast } = useToasts();
   const { t, language } = useI18n();
   const { readStream } = useStreamReader();
@@ -187,22 +193,19 @@ export const GovernancePortal: React.FC = () => {
   const votedIds = React.useMemo(() => new Set(votes.map(v => v.proposalId)), [votes]);
 
   // Evaluate expired proposals
-  const evaluatedProposals = React.useMemo(() =>
-    proposals.map(p => {
-      const status = evaluateProposal(p);
-      if (status !== p.status) {
-        return { ...p, status };
-      }
-      return p;
-    }),
-    [proposals],
-  );
+  const evaluatedProposals = proposals.map(p => {
+    const status = evaluateProposal(p);
+    if (status !== p.status) {
+      return { ...p, status };
+    }
+    return p;
+  });
 
   // Sync evaluated proposals back to storage
   React.useEffect(() => {
     const changed = evaluatedProposals.some((p, i) => p.status !== proposals[i]?.status);
     if (changed) setProposals(evaluatedProposals);
-  }, [evaluatedProposals]);
+  }, [evaluatedProposals, proposals, setProposals]);
 
   // Compute metrics
   React.useEffect(() => {
@@ -217,12 +220,15 @@ export const GovernancePortal: React.FC = () => {
       totalVoters: uniqueVoters,
       averageParticipation: totalPower > 0 ? Math.round((votes.length / totalPower) * 100) : 0,
     });
-  }, [evaluatedProposals, votes]);
+  }, [evaluatedProposals, votes, setMetrics]);
 
   const createProposal = () => {
-    if (!formData.title.trim()) { addToast({ type: 'error', message: 'Title is required.' }); return; }
-    if (!formData.description.trim()) { addToast({ type: 'error', message: 'Description is required.' }); return; }
+    fieldErrors.clearAll();
+    let valid = true;
+    if (!formData.title.trim()) { fieldErrors.setError('title', 'Title is required.'); valid = false; }
+    if (!formData.description.trim()) { fieldErrors.setError('description', 'Description is required.'); valid = false; }
     if (votingPower < 10) { addToast({ type: 'error', message: `Need ${10 - votingPower} more voting power to propose. Register carbon projects to gain VP.` }); return; }
+    if (!valid) { addToast({ type: 'error', message: 'Please fix the errors below.' }); return; }
 
     const id = `PROP-${Date.now().toString(36).toUpperCase()}`;
     const totalVP = Math.max(100, votingPower + evaluatedProposals.reduce((s, p) => {
@@ -264,7 +270,9 @@ export const GovernancePortal: React.FC = () => {
   const getAiDebate = async (proposal: Proposal) => {
     setIsLoadingDebate(true);
     setAiDebate(null);
+    setAiDebateError(null);
     setSelectedProposal(proposal);
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     try {
       const forVotes = votes.filter(v => v.proposalId === proposal.id && v.vote === 'for');
       const againstVotes = votes.filter(v => v.proposalId === proposal.id && v.vote === 'against');
@@ -275,16 +283,16 @@ export const GovernancePortal: React.FC = () => {
         systemInstruction: withLanguage(GOVERNANCE_INSTRUCTION, language),
       });
       let fullText = '';
-      let timeoutId: ReturnType<typeof setTimeout> | null = null;
       await readStream(stream, chunk => {
         fullText += chunk;
         if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout(() => setAiDebate(fullText), 50);
-      });
+      }, undefined, { streamTimeout: 45000, totalTimeout: 180000 });
       if (timeoutId) clearTimeout(timeoutId);
       setAiDebate(fullText);
-    } catch {
-      addToast({ type: 'error', message: 'Failed to get AI analysis.' });
+    } catch (e) {
+      if (timeoutId) clearTimeout(timeoutId);
+      setAiDebateError(e instanceof Error ? e.message : 'Failed to get AI analysis.');
     } finally {
       setIsLoadingDebate(false);
     }
@@ -337,23 +345,20 @@ export const GovernancePortal: React.FC = () => {
               <div className="p-4 bg-slate-50 border-b border-slate-200 space-y-3">
                 <h3 className="font-bold text-sm text-slate-700">{t('gov.create.title')}</h3>
                 <p className="text-xs text-slate-500">{t('gov.create.desc')}</p>
-                <div>
-                  <label htmlFor="prop-title" className="block text-xs font-medium text-slate-600 mb-1">{t('gov.proposal.title')}</label>
-                  <input id="prop-title" type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                </div>
-                <div>
-                  <label htmlFor="prop-desc" className="block text-xs font-medium text-slate-600 mb-1">{t('gov.proposal.desc')}</label>
-                  <textarea id="prop-desc" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={3}
-                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                </div>
-                <div>
-                  <label htmlFor="prop-cat" className="block text-xs font-medium text-slate-600 mb-1">{t('gov.proposal.category')}</label>
+                <FormField label={t('gov.proposal.title')} htmlFor="prop-title" required error={fieldErrors.errors.title}>
+                  <input id="prop-title" type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} onBlur={() => { fieldErrors.markTouched('title'); if (!formData.title.trim()) fieldErrors.setError('title', 'Title is required.'); else fieldErrors.clearError('title'); }} maxLength={200}
+                    className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[40px] ${fieldErrors.errors.title ? 'border-red-500' : 'border-slate-300'}`} aria-describedby={fieldErrors.errors.title ? 'prop-title-error' : undefined} />
+                </FormField>
+                <FormField label={t('gov.proposal.desc')} htmlFor="prop-desc" required error={fieldErrors.errors.description}>
+                  <textarea id="prop-desc" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} onBlur={() => { fieldErrors.markTouched('description'); if (!formData.description.trim()) fieldErrors.setError('description', 'Description is required.'); else fieldErrors.clearError('description'); }} rows={3} maxLength={2000}
+                    className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500 ${fieldErrors.errors.description ? 'border-red-500' : 'border-slate-300'}`} aria-describedby={fieldErrors.errors.description ? 'prop-desc-error' : undefined} />
+                </FormField>
+                <FormField label={t('gov.proposal.category')} htmlFor="prop-cat">
                   <select id="prop-cat" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value as ProposalCategory })}
-                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-green-500 min-h-[40px]">
                     {categories.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
                   </select>
-                </div>
+                </FormField>
                 <button onClick={createProposal} disabled={votingPower < 10 || !formData.title.trim()}
                   className="w-full py-2 text-sm font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:bg-slate-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-purple-500">
                   {votingPower < 10 ? `${t('gov.needVP')} ${10 - votingPower}` : t('gov.submit')}
@@ -363,11 +368,13 @@ export const GovernancePortal: React.FC = () => {
 
             <div className="max-h-[60vh] overflow-y-auto divide-y divide-slate-100">
               {evaluatedProposals.length === 0 ? (
-                <div className="p-8 text-center text-sm text-slate-500" role="status">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                  <p className="font-semibold">{t('gov.empty.title')}</p>
-                  <p className="text-xs mt-1">{t('gov.empty.desc')}</p>
-                </div>
+                <EmptyState
+                  icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                  title={t('gov.empty.title')}
+                  description={t('gov.empty.desc')}
+                  actionLabel={t('gov.newProposal')}
+                  onAction={() => setShowForm(true)}
+                />
               ) : evaluatedProposals.map(p => (
                 <div key={p.id} className={`p-4 hover:bg-slate-50 transition-colors ${selectedProposal?.id === p.id ? 'bg-purple-50' : ''}`}>
                   <div className="flex justify-between items-start mb-2">
@@ -383,26 +390,28 @@ export const GovernancePortal: React.FC = () => {
                     <span>{p.status === 'active' ? `${t('gov.proposal.ends')} ${new Date(p.endDate).toLocaleDateString()}` : p.status === 'passed' || p.status === 'executed' ? `${t('gov.proposal.passed')} ${p.executedAt ? new Date(p.executedAt).toLocaleDateString() : ''}` : 'Rejected'}</span>
                   </div>
                   <ProgressBar proposal={p} />
-                  {p.status === 'active' && (
-                    <div className="flex gap-2 mt-3">
-                      {!votedIds.has(p.id) ? (
-                        <>
-                          <button onClick={() => castVote(p.id, 'for')} className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">{t('gov.voteFor')}</button>
-                          <button onClick={() => castVote(p.id, 'against')} className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-red-500 text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500">{t('gov.voteAgainst')}</button>
-                          <button onClick={() => castVote(p.id, 'abstain')} className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-slate-300 text-slate-700 hover:bg-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400">{t('gov.abstain')}</button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
-                          <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-                          {t('gov.youVoted')}
-                        </span>
-                      )}
-                      <button onClick={() => { setSelectedProposal(p); getAiDebate(p); }}
-                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-400">
+                  <div className="flex gap-2 mt-3">
+                    {p.status === 'active' && (
+                      <>
+                        {!votedIds.has(p.id) ? (
+                          <>
+                            <button onClick={() => castVote(p.id, 'for')} className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[44px]">{t('gov.voteFor')}</button>
+                            <button onClick={() => castVote(p.id, 'against')} className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-red-500 text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 min-h-[44px]">{t('gov.voteAgainst')}</button>
+                            <button onClick={() => castVote(p.id, 'abstain')} className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-slate-300 text-slate-700 hover:bg-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 min-h-[44px]">{t('gov.abstain')}</button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                            {t('gov.youVoted')}
+                          </span>
+                        )}
+                      </>
+                    )}
+                    <button onClick={() => { setSelectedProposal(p); getAiDebate(p); }}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-400">
 {t('gov.aiDebate')}
-                      </button>
-                    </div>
-                  )}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -426,8 +435,15 @@ export const GovernancePortal: React.FC = () => {
             <div className="p-3 max-h-64 overflow-y-auto text-sm text-slate-600" role="status" aria-live="polite">
               {isLoadingDebate ? (
                 <LoadingSpinner size="sm" message={t('gov.analyzing')} />
+              ) : aiDebateError ? (
+                <div className="p-3 bg-red-50 rounded-lg">
+                  <p className="text-red-700 text-sm">{aiDebateError}</p>
+                  <button onClick={() => selectedProposal && getAiDebate(selectedProposal)} className="mt-2 text-xs font-semibold text-brand-green-600 hover:text-brand-green-800 focus:outline-none focus:ring-2 focus:ring-brand-green-500 rounded min-h-[32px]">
+                    {t('common.retry') || 'Retry'}
+                  </button>
+                </div>
               ) : aiDebate ? (
-                <p className="whitespace-pre-line">{aiDebate.slice(0, 800)}{aiDebate.length > 800 ? <span className="text-xs text-slate-400">...</span> : ''}</p>
+                <ExpandableContent content={aiDebate} maxLength={800} />
               ) : (
                 <p className="text-slate-400 italic">{t('gov.aiDebate.empty')}</p>
               )}

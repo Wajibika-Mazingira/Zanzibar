@@ -34,7 +34,7 @@ data:
     server {
         listen 80;
         server_name _;
-        client_max_body_size 25m;
+        client_max_body_size 5m;
 
         root /usr/share/nginx/html;
         index index.html;
@@ -43,7 +43,7 @@ data:
         location /wajibika-mazingira/ {
             try_files $uri $uri/ /wajibika-mazingira/index.html;
             expires 1h;
-            add_header Cache-Control "public, immutable" always;
+            add_header Cache-Control "public, must-revalidate" always;
         }
 
         # Static assets with caching
@@ -55,8 +55,8 @@ data:
         # Health check
         location /health {
             access_log off;
-            return 200 "healthy\n";
             add_header Content-Type text/plain;
+            return 200 "healthy\n";
         }
 
         # Deny hidden files

@@ -5,7 +5,7 @@ const mockStreamChat = vi.fn();
 const mockStreamImageAnalysis = vi.fn();
 const mockGenerateChat = vi.fn();
 
-vi.mock('../contexts/AiProviderContext', () => {
+vi.mock('../contexts/aiProviderLib', () => {
   const mockProvider = {
     streamChat: mockStreamChat,
     streamImageAnalysis: mockStreamImageAnalysis,
@@ -13,7 +13,7 @@ vi.mock('../contexts/AiProviderContext', () => {
   };
   return {
     getProvider: vi.fn(() => mockProvider),
-    AiProviderContext: ({ children }: any) => children,
+    AiProviderCtx: { Provider: ({ children }: { children: React.ReactNode }) => children },
     useAiProvider: vi.fn(() => ({
       config: { type: 'ollama', ollamaUrl: 'http://localhost:11434', ollamaModel: 'test-model' },
       provider: mockProvider,

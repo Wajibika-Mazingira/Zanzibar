@@ -6,10 +6,21 @@ import { useI18n } from '../config/i18n';
 
 // Import Zanzibar showcase images
 import ZanzibarHero from '../assets/zanzibar-hero.jpg';
+import ZanzibarJozaniForest from '../assets/zanzibar-jozani-forest.jpg';
 import ZanzibarMangroves from '../assets/zanzibar-mangroves.jpg';
-import ZanzibarCoralReef from '../assets/zanzibar-coral-reef.jpg';
 import ZanzibarSeaweed from '../assets/zanzibar-seaweed.jpg';
 import ZanzibarSolar from '../assets/zanzibar-solar.jpg';
+import ZanzibarCoralReef from '../assets/zanzibar-coral-reef.jpg';
+
+const ZONE_TRANSLATION_KEYS: Record<string, string> = {
+  'Misitu ya Mikoko': 'zanzibar.zone.misitu-ya-mikoko',
+  'Miamba ya Matumbawe': 'zanzibar.zone.miamba-ya-matumbawe',
+  'Majani ya Bahari': 'zanzibar.zone.majani-ya-bahari',
+  'Hifadhi ya Jozani': 'zanzibar.zone.hifadhi-ya-jozani',
+  'Misitu ya Mvuli': 'zanzibar.zone.misitu-ya-mvuli',
+  'Misitu ya Pwani': 'zanzibar.zone.misitu-ya-pwani',
+  'Vishamba vya Mwani': 'zanzibar.zone.vishamba-vya-mwani',
+};
 
 const projectTypeIcons: Record<string, string> = {
   blue_carbon: '🌊',
@@ -22,46 +33,67 @@ const projectTypeIcons: Record<string, string> = {
   other: '🌍',
 };
 
+const SDG_KEYS: Record<string, string> = {
+  'Life on Land': 'zanzibar.sdg.lifeOnLand',
+  'Climate Action': 'zanzibar.sdg.climateAction',
+  'Biodiversity Conservation': 'zanzibar.sdg.biodiversityConservation',
+  'Life Below Water': 'zanzibar.sdg.lifeBelowWater',
+  'Sustainable Communities': 'zanzibar.sdg.sustainableCommunities',
+  'Gender Equality': 'zanzibar.sdg.genderEquality',
+  'Affordable and Clean Energy': 'zanzibar.sdg.affordableCleanEnergy',
+  'Innovation': 'zanzibar.sdg.innovation',
+};
+
 const showcaseProjects = [
   {
     id: 'showcase-znz-jozani',
-    name: 'Uhifadhi wa Msitu wa Jozani',
-    location: 'Unguja Kusini, Zanzibar',
+    nameKey: 'zanzibar.project.jozani.name',
+    locationKey: 'zanzibar.project.jozani.location',
     type: 'conservation' as CarbonProjectType,
     areaHectares: 5000,
     rate: 8,
-    description: 'Uhifadhi na urejeshaji wa msitu wa mvuli wa Jozani, makazi ya Colobus mwekundu wa Zanzibar.',
+    descKey: 'zanzibar.project.jozani.desc',
     sdg: ['Life on Land', 'Climate Action', 'Biodiversity Conservation'],
   },
   {
     id: 'showcase-znz-mangroves',
-    name: 'Urejeshaji wa Mikoko ya Zanzibar',
-    location: 'Pemba Kaskazini, Zanzibar',
+    nameKey: 'zanzibar.project.mangroves.name',
+    locationKey: 'zanzibar.project.mangroves.location',
     type: 'blue_carbon' as CarbonProjectType,
     areaHectares: 12000,
     rate: 7,
-    description: 'Mradi mkubwa wa urejeshaji wa mikoko kuzunguka kisiwa cha Pemba na Unguja kwa ajili ya kaboni ya buluu.',
+    descKey: 'zanzibar.project.mangroves.desc',
     sdg: ['Life Below Water', 'Climate Action', 'Sustainable Communities'],
   },
   {
     id: 'showcase-znz-seaweed',
-    name: 'Kilimo Endelevu cha Mwani',
-    location: 'Pemba Kusini, Zanzibar',
+    nameKey: 'zanzibar.project.seaweed.name',
+    locationKey: 'zanzibar.project.seaweed.location',
     type: 'blue_carbon' as CarbonProjectType,
     areaHectares: 3000,
     rate: 5,
-    description: 'Kuwawezesha wanawake katika jamii za pwani kupitia kilimo cha mwani kinachochangia ufyonzaji wa kaboni ya buluu.',
+    descKey: 'zanzibar.project.seaweed.desc',
     sdg: ['Gender Equality', 'Life Below Water', 'Climate Action'],
   },
   {
     id: 'showcase-znz-solar',
-    name: 'Nishati ya Jua Zanzibar',
-    location: 'Mjini Magharibi, Zanzibar',
+    nameKey: 'zanzibar.project.solar.name',
+    locationKey: 'zanzibar.project.solar.location',
     type: 'renewable_energy' as CarbonProjectType,
     areaHectares: 500,
     rate: 4,
-    description: 'Ufungaji wa paneli za jua katika vijiji vya Zanzibar kupunguza utegemezi wa mkaa na kuokoa misitu.',
+    descKey: 'zanzibar.project.solar.desc',
     sdg: ['Affordable and Clean Energy', 'Climate Action', 'Innovation'],
+  },
+  {
+    id: 'showcase-znz-coral',
+    nameKey: 'zanzibar.project.coral.name',
+    locationKey: 'zanzibar.project.coral.location',
+    type: 'conservation' as CarbonProjectType,
+    areaHectares: 1500,
+    rate: 3,
+    descKey: 'zanzibar.project.coral.desc',
+    sdg: ['Life Below Water', 'Climate Action', 'Biodiversity Conservation'],
   },
 ];
 
@@ -83,7 +115,7 @@ export const ZanzibarShowcase: React.FC = () => {
         <div className="absolute inset-0">
           <img 
             src={ZanzibarHero} 
-            alt="Zanzibar coastal landscape with mangroves" 
+            alt={t('zanzibar.hero.alt')}
             className="w-full h-full object-cover opacity-30"
           />
         </div>
@@ -93,7 +125,7 @@ export const ZanzibarShowcase: React.FC = () => {
             <span className="text-4xl">🇹🇿</span>
             <div>
               <h1 className="text-3xl md:text-4xl font-bold">{t('zanzibar.title')}</h1>
-              <p className="text-brand-green-200 text-sm md:text-base mt-1">{t('zanzibar.country')} · East African Community</p>
+              <p className="text-brand-green-200 text-sm md:text-base mt-1">{t('zanzibar.country')} · {t('zanzibar.hero.eac')}</p>
             </div>
           </div>
           <p className="max-w-3xl text-brand-green-100 text-base md:text-lg leading-relaxed">
@@ -129,11 +161,11 @@ export const ZanzibarShowcase: React.FC = () => {
                   <h3 className="font-bold text-slate-700 text-sm">{locale.name}</h3>
                 </div>
                 {locale.showcaseDescription && (
-                  <p className="text-xs text-slate-600 mb-3">{locale.showcaseDescription}</p>
+                  <p className="text-xs text-slate-600 mb-3">{t(`zanzibar.locale.description.${locale.id}`, locale.showcaseDescription)}</p>
                 )}
                 <div className="space-y-1 text-xs text-slate-500">
-                  <p><span className="font-semibold">Biodiversity:</span> {locale.biodiversityZones?.join(', ')}</p>
-                  <p><span className="font-semibold">Carbon types:</span> {locale.carbonProjectTypes?.map(t => projectTypeIcons[t] || '🌍').join(' ')}</p>
+                  <p><span className="font-semibold">{t('zanzibar.locale.biodiversity')}</span> {locale.biodiversityZones?.map(z => { const k = ZONE_TRANSLATION_KEYS[z]; return k ? t(k) : z; }).join(', ')}</p>
+                  <p><span className="font-semibold">{t('zanzibar.locale.carbonTypes')}</span> {locale.carbonProjectTypes?.map(ct => projectTypeIcons[ct] || '🌍').join(' ')}</p>
                 </div>
               </div>
             ))}
@@ -145,10 +177,11 @@ export const ZanzibarShowcase: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {showcaseProjects.map((project, index) => {
           const projectImages = [
+            ZanzibarJozaniForest,
             ZanzibarMangroves,
-            ZanzibarCoralReef,
             ZanzibarSeaweed,
             ZanzibarSolar,
+            ZanzibarCoralReef,
           ];
           const image = projectImages[index];
           
@@ -158,7 +191,7 @@ export const ZanzibarShowcase: React.FC = () => {
                 <div className="relative mb-3">
                   <img 
                     src={image} 
-                    alt={`${project.name} - Zanzibar conservation project`} 
+                    alt={t('zanzibar.project.alt', t(project.nameKey))}
                     className="w-full h-48 object-cover rounded-lg mb-3"
                   />
                   <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1">
@@ -166,10 +199,10 @@ export const ZanzibarShowcase: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800">{project.name}</h3>
-                  <p className="text-xs text-slate-500">{project.location}</p>
+                  <h3 className="font-bold text-slate-800">{t(project.nameKey)}</h3>
+                  <p className="text-xs text-slate-500">{t(project.locationKey)}</p>
                 </div>
-                <p className="text-sm text-slate-600 mb-4">{project.description}</p>
+                <p className="text-sm text-slate-600 mb-4">{t(project.descKey)}</p>
                 <div className="grid grid-cols-3 gap-3 text-sm mb-3">
                   <div>
                     <span className="text-xs text-slate-500">{t('carbon.project.area')}</span>
@@ -180,13 +213,13 @@ export const ZanzibarShowcase: React.FC = () => {
                     <p className="font-semibold">{project.rate} tCO₂/ha/yr</p>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500">Type</span>
+                    <span className="text-xs text-slate-500">{t('zanzibar.project.type')}</span>
                     <p className="font-semibold capitalize">{project.type.replace(/_/g, ' ')}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {project.sdg.map(s => (
-                    <span key={s} className="px-2 py-0.5 text-xs bg-brand-green-100 text-brand-green-800 rounded-full">{s}</span>
+                    <span key={s} className="px-2 py-0.5 text-xs bg-brand-green-100 text-brand-green-800 rounded-full">{t(SDG_KEYS[s] || s)}</span>
                   ))}
                 </div>
               </div>
@@ -195,15 +228,39 @@ export const ZanzibarShowcase: React.FC = () => {
         })}
       </div>
 
+      {/* Companion Applications */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="p-6 border-b border-slate-200">
+          <h2 className="text-xl font-bold text-slate-800">{t('zanzibar.companion.title')}</h2>
+          <p className="text-sm text-slate-500 mt-1">{t('zanzibar.companion.desc')}</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-6">
+          {[
+            { key: 'landDeveloper', icon: '🏗️' },
+            { key: 'communityReporter', icon: '📢' },
+            { key: 'carbonWallet', icon: '💳' },
+            { key: 'conservationMap', icon: '🗺️' },
+          ].map(app => (
+            <div key={app.key} className="p-4 border border-slate-200 rounded-xl hover:shadow-md transition-shadow bg-slate-50">
+              <span className="text-3xl block mb-3">{app.icon}</span>
+              <h3 className="font-bold text-slate-800 text-sm mb-1">{t(`zanzibar.companion.${app.key}.name`)}</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">{t(`zanzibar.companion.${app.key}.desc`)}</p>
+            </div>
+          ))}
+        </div>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 text-center">
+          <p className="text-xs text-slate-400">{t('zanzibar.companion.cta')}</p>
+        </div>
+      </div>
+
       {/* Call to Action */}
       <div className="text-center p-8 bg-gradient-to-r from-brand-green-50 to-blue-50 rounded-2xl border border-brand-green-200">
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">Jiunge na Uhifadhi wa Zanzibar</h2>
+        <h2 className="text-2xl font-bold text-slate-800 mb-3">{t('zanzibar.cta.title')}</h2>
         <p className="text-slate-600 max-w-2xl mx-auto mb-6">
-          Zanzibar ina fursa za kipekee za kaboni ya buluu, uhifadhi wa bayoanuwai, na maendeleo endelevu.
-          Sajili mradi wako wa kaboni leo na uwe sehemu ya mabadiliko.
+          {t('zanzibar.cta.desc')}
         </p>
         <p className="text-sm text-slate-500">
-          🇹🇿 Tanzania · 🇰🇪 Kenya · 🇺🇬 Uganda · 🇷🇼 Rwanda · 🇧🇮 Burundi · 🇨🇩 DR Congo · 🇸🇸 South Sudan · 🇸🇴 Somalia
+          {t('zanzibar.cta.countries')}
         </p>
       </div>
     </div>

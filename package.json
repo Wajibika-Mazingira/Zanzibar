@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "dev:all": "npm run dev --workspaces --if-present --parallel",
+    "dev:all": "concurrently -n main,dev,maps,wallet,reporter -c green,blue,yellow,magenta,cyan \"npm run dev\" \"npm run dev --workspace=@wajibika/land-developer\" \"npm run dev --workspace=@wajibika/conservation-map\" \"npm run dev --workspace=@wajibika/carbon-wallet\" \"npm run dev --workspace=@wajibika/community-reporter\"",
     "build": "vite build && node -e \"require('fs').copyFileSync('dist/index.html','dist/404.html')\"",
     "build:all": "npm run build --workspaces --if-present",
     "preview": "vite preview",
@@ -41,6 +41,7 @@
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^6.0.0",
     "autoprefixer": "^10.4.19",
+    "concurrently": "^10.0.3",
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",

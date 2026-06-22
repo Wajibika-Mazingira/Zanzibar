@@ -105,39 +105,59 @@ Store reports and upload photographic evidence with AI-powered image analysis. E
 ### 🤖 **AI Community Assistant**
 Engage with "Mazingira Rafiki," a multi-mode AI assistant with voice-to-text, text-to-speech, and modes for fast, smart, grounded, and maps-based queries.
 
-## 📱 Companion Applications
+## 📱 Companion Applications (Monorepo)
 
-Wajibika Mazingira is part of a suite of companion applications within the **minima PiNet OS** ecosystem. Each app focuses on a specific aspect of environmental conservation and carbon management:
+Wajibika Mazingira is part of a monorepo suite of companion applications within the **minima PiNet OS** ecosystem. Each app focuses on a specific aspect of environmental conservation and carbon management. All apps live in the `apps/` directory of this same repository.
 
-| Application | Description |
-|-------------|-------------|
-| **Wajibika Mazingira** (this app) | Core platform — AI impact assessments, carbon dashboard, marketplace, governance, passports |
-| **Land Developer** | Land parcel registration, zoning, and environmental impact analysis for developers |
-| **Community Reporter** | Lightweight environmental incident reporting and community collaboration |
-| **Carbon Wallet** | Mobile carbon credit wallet — manage balances, verify credits, and trade on the go |
-| **Conservation Map** | Interactive map visualization of all conservation projects and environmental data |
+### Project Structure
 
-### Running the Full Suite
+```
+wajibika-mazingira/
+├── src/                          # Main app — core platform
+├── apps/
+│   ├── land-developer/           # Land parcel registration & impact analysis
+│   ├── community-reporter/       # Environmental incident reporting
+│   ├── carbon-wallet/            # Carbon credit wallet & transactions
+│   └── conservation-map/         # Interactive conservation project map
+├── package.json                  # Root with npm workspaces
+└── ...
+```
 
-All companion applications follow the same development pattern. To run them side by side:
+| Application | Port | Description |
+|-------------|------|-------------|
+| **Wajibika Mazingira** (root) | `:5173` | Core platform — AI impact assessments, carbon dashboard, marketplace, governance, passports |
+| **Land Developer** | `:5174` | Land parcel registration, zoning, and environmental impact analysis for developers |
+| **Community Reporter** | `:5175` | Lightweight environmental incident reporting and community collaboration |
+| **Carbon Wallet** | `:5176` | Mobile carbon credit wallet — manage balances, verify credits, and trade on the go |
+| **Conservation Map** | `:5177` | Interactive map visualization of all conservation projects and environmental data |
 
-1. **Clone each app repository:**
-   ```bash
-   git clone https://github.com/WilliamMajanja/wajibika-mazingira.git
-   git clone https://github.com/WilliamMajanja/land-developer.git
-   git clone https://github.com/WilliamMajanja/community-reporter.git
-   git clone https://github.com/WilliamMajanja/carbon-wallet.git
-   git clone https://github.com/WilliamMajanja/conservation-map.git
-   ```
+### Running All Apps
 
-2. **Install and start each app** (in separate terminals):
-   ```bash
-   cd <app-directory>
-   npm install
-   npm run dev
-   ```
+The monorepo uses **npm workspaces**. Install dependencies once from the root:
 
-3. Each app runs on its own port (e.g., `:5173`, `:5174`, etc.) and can be accessed independently through the minima PiNet OS launcher.
+```bash
+npm install
+```
+
+To run all apps simultaneously:
+
+```bash
+npm run dev:all
+```
+
+To run a specific app:
+
+```bash
+npm run dev --workspace=@wajibika/land-developer
+```
+
+To build all apps for production:
+
+```bash
+npm run build:all
+```
+
+Each app runs on its own port (5173–5177) and can be accessed independently or through the minima PiNet OS launcher.
 
 ## 🛠 Technology Stack
 

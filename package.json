@@ -29,7 +29,7 @@
   "dependencies": {
     "html2pdf.js": "^0.14.0",
     "marked": "^12.0.2",
-    "react": "^19.1.1",
+    "react": "^19.2.7",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0"
   },

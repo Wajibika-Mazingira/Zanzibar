@@ -245,7 +245,7 @@ export const EvidenceLocker: React.FC = () => {
               <button role="tab" aria-selected={activeTab === 'risk'} id="el-tab-risk" aria-controls="el-panel-risk" onClick={() => setActiveTab('risk')} className={`px-2 py-1.5 text-xs rounded-full min-h-[32px] ${activeTab === 'risk' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>{t('locker.risk')}</button>
               </div>
             </div>
-            <div role="tabpanel" aria-label="Assessment list" className="max-h-[40vh] md:max-h-[calc(100vh-10rem)] overflow-y-auto">
+            <div role="tabpanel" aria-label="Assessment list" className="max-h-[40dvh] md:max-h-[calc(100dvh-10rem)] overflow-y-auto">
               {filteredAssessments.length === 0 ? <p className="p-4 text-sm text-slate-500">{t('locker.noSaved')}</p> : (
                   <ul>{filteredAssessments.map(assessment => (
                       <li key={assessment.id} className={`border-b border-slate-200 last:border-b-0 ${selectedAssessment?.id === assessment.id ? 'bg-brand-green-50' : ''}`}>
@@ -274,7 +274,7 @@ export const EvidenceLocker: React.FC = () => {
                     </div>
                 )}
             </div>
-            <div className="min-h-[50vh] md:max-h-[calc(100vh-12rem)] overflow-y-auto" key={selectedAssessment?.id}>
+            <div className="min-h-[50dvh] md:max-h-[calc(100dvh-12rem)] overflow-y-auto" key={selectedAssessment?.id}>
                 {selectedAssessment ? (
                     <div className="divide-y divide-slate-200">
                         {isEditing ? (

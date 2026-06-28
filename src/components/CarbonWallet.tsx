@@ -101,7 +101,7 @@ export function CarbonWallet() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 pb-10">
+    <div className="min-h-[100dvh] bg-slate-100 pb-10">
       <div className="max-w-lg mx-auto space-y-4">
         <section className="bg-white rounded-2xl shadow p-5">
           <div className="flex justify-between items-start">

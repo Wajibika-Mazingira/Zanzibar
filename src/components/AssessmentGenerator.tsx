@@ -194,7 +194,7 @@ export const AssessmentGenerator: React.FC = () => {
                 <h2 className="text-xl font-bold text-slate-800">{t('assessment.title')}</h2>
                 <p className="text-sm text-slate-500">{t('assessment.subtitle')}</p>
             </div>
-            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="p-6 space-y-4 max-h-[60dvh] overflow-y-auto">
                 <div>
                     <label htmlFor="projectName" className="block text-sm font-medium text-slate-700 mb-1">{t('assessment.projectName')} <span className="text-red-500">*</span></label>
                     <input type="text" name="projectName" id="projectName" value={formData.projectName} onChange={handleChange} required className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-green-500 focus:border-brand-green-500" />
@@ -288,7 +288,7 @@ export const AssessmentGenerator: React.FC = () => {
                     </div>
                 )}
             </div>
-            <div className="min-h-[50vh] md:max-h-[calc(100vh-12rem)] overflow-y-auto">
+            <div className="min-h-[50dvh] md:max-h-[calc(100dvh-12rem)] overflow-y-auto">
                 {isLoading && !generatedReport && (
                     <div className="p-6 flex flex-col items-center justify-center h-full text-slate-500 text-center">
                        <svg className="animate-spin h-10 w-10 text-brand-green-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

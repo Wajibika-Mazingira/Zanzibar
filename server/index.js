@@ -252,7 +252,7 @@ app.post('/generate-pdf', pdfLimiter, async (req, res) => {
     return res.send(Buffer.from(pdfBytes));
   } catch (err) {
     const duration = Date.now() - startTime;
-    console.error(`[PDF] Generation failed in ${duration}ms, requestId: ${req.requestId}:`, err.message);
+    console.error('[PDF] Generation failed in %sms, requestId: %s: %s', duration, req.requestId, err.message);
     return res.status(500).json({
       error: 'PDF generation failed',
       requestId: req.requestId,

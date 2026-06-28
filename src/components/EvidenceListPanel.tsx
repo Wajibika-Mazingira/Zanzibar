@@ -28,7 +28,7 @@ export default function EvidenceListPanel({
           <div key={item.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
             <div className="flex flex-col md:flex-row gap-4">
               {item.type === 'image' ? (
-                <img src={item.data} alt={item.name} className="w-full md:w-48 h-auto object-cover rounded-md" />
+                <img src={item.data} alt={item.name} loading="lazy" decoding="async" className="w-full md:w-48 h-auto object-cover rounded-md" />
               ) : (
                 <div className="w-full md:w-48 max-h-48 overflow-y-auto p-3 bg-white rounded-md border border-slate-200 prose prose-sm max-w-none">
                   <ReactMarkdown>{item.data}</ReactMarkdown>

@@ -162,10 +162,45 @@ Each app runs on its own port (5173–5177) and can be accessed independently or
 ## 🛠 Technology Stack
 
 - **Frontend**: React 19, TypeScript, Vite 8
-- **Styling**: Tailwind CSS 3.4
+- **Styling**: Tailwind CSS 4 with fluid `clamp()` typography scale
 - **AI**: Ollama (local) or OpenRouter (cloud) — no API key required for Ollama
 - **Storage**: Client-side localStorage
-- **Deployment**: GitHub Pages
+- **Deployment**: GitHub Pages, Docker, Kubernetes/k3s
+
+## 📱 Cross-Platform Optimizations
+
+Wajibika Mazingira is built for every device — from low-end smartphones in rural East Africa to desktops and large displays. The following optimizations ensure a consistent, accessible experience across all platforms:
+
+### Fluid Typography
+Font sizes scale smoothly between viewports using `clamp()` values rather than discrete breakpoints, ensuring readability on any screen size without manual breakpoint tuning.
+
+### Safe Area Support
+The app respects `safe-area-inset-*` environment variables for notched and rounded display devices (iPhone X+, modern Android). Body padding, sticky header, and toast notifications all account for display cutouts.
+
+### Touch-Optimized UI
+- All interactive elements meet **44×44px minimum touch target** size (WCAG 2.5.5)
+- Responsive grid layouts collapse at `lg` (1024px) rather than `xl` (1280px) for better tablet ergonomics
+- Horizontal scroll fallback for tables on narrow viewports
+
+### Reduced Motion
+A `prefers-reduced-motion` media query disables all animations and transitions for users who prefer reduced motion, respecting system accessibility settings.
+
+### Dark Mode
+Automatic dark mode support via `prefers-color-scheme: dark` media query. The app adapts to the user's system preference without manual toggling.
+
+### Print Styles
+Dedicated `@media print` rules hide navigation chrome and format content for clean paper or PDF output.
+
+### Image Optimization
+- `loading="lazy"` and `decoding="async"` for all images
+- `aspect-ratio` based containers prevent layout shift (CLS)
+- Responsive image containers adapt to viewport width
+
+### Build Performance
+- `react.lazy` + `<Suspense>` code splitting per route
+- Manual vendor chunking for `react`, `react-dom`, `react-markdown`, and `html2pdf`
+- Lightning CSS minification in production builds
+- Source maps disabled in production for faster loads
 
 ## 🚀 Getting Started
 
@@ -193,7 +228,7 @@ Each app runs on its own port (5173–5177) and can be accessed independently or
     ```bash
     npm run dev
     ```
-4.  Open your browser and navigate to the local address provided (e.g., `http://localhost:5173`).
+ 4. Open your browser and navigate to the local address provided (e.g., `http://localhost:5173/wajibika-mazingira/`). To expose on your network, use `npm run dev -- --host`.
 5.  Click the **AI icon (✨)** in the header to configure your AI provider — choose Ollama (default, local) or OpenRouter (cloud).
 
 ## Carbon Credit System

@@ -179,7 +179,7 @@ export const Header: React.FC<HeaderProps> = ({ activePage, setActivePage }) => 
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
              {/* Desktop Navigation */}
-             <nav className="hidden xl:flex items-center gap-0.5 bg-white/5 backdrop-blur-md px-2 py-1.5 rounded-lg border border-white/10 shadow-md">
+             <nav className="hidden lg:flex items-center gap-0.5 bg-white/5 backdrop-blur-md px-2 py-1.5 rounded-lg border border-white/10 shadow-md">
                {primaryNav.map(nav => (
                  <NavItem key={nav.page} labelKey={nav.labelKey} page={nav.page} activePage={activePage} onClick={handleNavClick} Icon={nav.Icon} onHover={prefetchPage} />
                ))}
@@ -230,14 +230,14 @@ export const Header: React.FC<HeaderProps> = ({ activePage, setActivePage }) => 
                <AiIcon className="h-6 w-6 transition-transform group-hover:scale-110" />
              </button>
              {/* Mobile Menu Toggle */}
-              <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="xl:hidden p-2.5 text-white hover:bg-white/15 backdrop-blur-sm transition-all duration-300 rounded-lg shadow-md group min-h-[44px] min-w-[44px] items-center justify-center flex" aria-label="Toggle navigation menu" aria-expanded={showMobileMenu}>
+              <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="lg:hidden p-2.5 text-white hover:bg-white/15 backdrop-blur-sm transition-all duration-300 rounded-lg shadow-md group min-h-[44px] min-w-[44px] items-center justify-center flex" aria-label="Toggle navigation menu" aria-expanded={showMobileMenu}>
                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showMobileMenu ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} /></svg>
              </button>
           </div>
         </div>
         {/* Mobile Dropdown Menu */}
         {showMobileMenu && (
-          <div className="xl:hidden pb-3 px-2 border-t border-white/10">
+          <div className="lg:hidden pb-3 px-2 border-t border-white/10">
             <nav className="flex flex-col gap-1.5 bg-white/5 backdrop-blur-md p-3 rounded-lg mt-3 shadow-md">
               {[...primaryNav, ...moreNav].map(nav => (
                 <button key={nav.page} onClick={() => handleNavClick(nav.page)}

@@ -9,6 +9,7 @@ export default defineConfig({
   server: { port: 5173 },
   build: {
     sourcemap: false,
+    cssMinify: 'lightningcss',
     rollupOptions: {
       output: {
         manualChunks(id) {

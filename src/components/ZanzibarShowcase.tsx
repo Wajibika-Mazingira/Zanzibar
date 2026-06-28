@@ -116,6 +116,8 @@ export const ZanzibarShowcase: React.FC = () => {
           <img 
             src={ZanzibarHero} 
             alt={t('zanzibar.hero.alt')}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover opacity-30"
           />
         </div>
@@ -192,7 +194,9 @@ export const ZanzibarShowcase: React.FC = () => {
                   <img 
                     src={image} 
                     alt={t('zanzibar.project.alt', t(project.nameKey))}
-                    className="w-full h-48 object-cover rounded-lg mb-3"
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full aspect-video object-cover rounded-lg mb-3"
                   />
                   <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1">
                     <span className="text-lg">{projectTypeIcons[project.type] || '🌍'}</span>

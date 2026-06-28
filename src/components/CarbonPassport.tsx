@@ -784,7 +784,8 @@ export const CarbonPassportComponent: React.FC = () => {
               <p className="p-4 text-sm text-slate-400 italic">{t('passport.noAuditTrail')}</p>
             ) : (
               <div className="max-h-48 overflow-y-auto">
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto -mx-2 px-2 scrollbar-thin">
+                <table className="w-full text-sm min-w-[500px]">
                   <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
                     <tr>
                       <th className="p-2 text-left">{t('passport.date')}</th>
@@ -806,6 +807,7 @@ export const CarbonPassportComponent: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
           </Card>

@@ -77,7 +77,7 @@ export const ToastContainer: React.FC = () => {
     const { toasts, removeToast } = useToasts();
 
     return (
-        <div className="fixed bottom-4 right-4 z-50 w-full max-w-sm space-y-3" aria-label="Notifications">
+        <div className="fixed bottom-4 right-4 z-50 w-full max-w-sm space-y-3" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} aria-label="Notifications">
             {toasts.map(toast => (
                 <Toast key={toast.id} toast={toast} onDismiss={removeToast} />
             ))}

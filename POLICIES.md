@@ -1066,9 +1066,98 @@ Ensure effective management of crises and emergencies.
 
 ---
 
-# Summary
+# Cross-Platform and Accessibility Policies
 
-This comprehensive policy framework provides a solid foundation for the Wajibika Mazingira project's operations. The policies cover all essential aspects of organizational management, including:
+## Responsive Design Policy
+
+### Objective
+Ensure the platform delivers an optimal user experience across all device types — from low-end mobile phones to large desktop displays — with particular focus on East African communities where device diversity is high and older hardware is common.
+
+### Design Principles
+1. **Mobile-First Foundation**: All layouts are designed for small screens first, then enhanced for larger viewports using progressive enhancement
+2. **Fluid Scaling**: Use `clamp()` for typography so text scales smoothly between viewports without discrete breakpoints
+3. **Safe Area Respect**: Account for `safe-area-inset-*` on notched and rounded display devices to prevent content clipping
+4. **Touch-Friendly Targets**: All interactive elements must meet **44×44px minimum touch target size** (WCAG 2.5.5)
+
+### Breakpoint Strategy
+| Breakpoint | Width   | Target Devices                |
+|------------|---------|-------------------------------|
+| Default    | < 640px | Small phones                  |
+| `sm`       | ≥ 640px | Large phones / phablets       |
+| `md`       | ≥ 768px | Tablets (portrait)            |
+| `lg`       | ≥ 1024px| Tablets (landscape) / laptops |
+| `xl`       | ≥ 1280px| Desktops                      |
+| `2xl`      | ≥ 1536px| Large displays                |
+
+### Mobile Navigation
+- Navigation collapses into a hamburger menu at `lg` (1024px) for optimal tablet usage
+- All navigation buttons show icons always; text labels appear on `sm` and above
+- Mobile menu items meet 44px touch target minimums
+
+## Accessibility Policy
+
+### Objective
+Ensure the platform is usable by people with disabilities, including those using assistive technologies, in line with WCAG 2.1 AA standards.
+
+### Requirements
+1. **Keyboard Navigation**: All interactive elements must be reachable and operable via keyboard
+2. **Focus Indicators**: Clear `focus-visible` styles on all interactive elements
+3. **Screen Reader Support**:
+   - Semantic HTML landmarks (`<header>`, `<main>`, `<nav>`, `<footer>`)
+   - ARIA labels, roles, and states on all custom interactive components
+   - `aria-current="page"` for active navigation items
+   - `aria-live` regions for dynamic content updates
+4. **Reduced Motion**: Respect `prefers-reduced-motion` by disabling all animations and transitions when the user has requested reduced motion
+5. **Color Contrast**: All text must meet WCAG AA contrast ratios (4.5:1 for normal text, 3:1 for large text)
+6. **Skip Navigation**: A "Skip to main content" link must be the first focusable element on every page
+
+## Performance Policy
+
+### Objective
+Deliver fast load times and smooth interactions even on low-bandwidth connections and older devices common in rural East Africa.
+
+### Requirements
+1. **Code Splitting**: Use `React.lazy()` + `<Suspense>` to split code by route — no page loads until the user navigates to it
+2. **Vendor Chunking**: Separate framework code (`react`, `react-dom`) and heavy libraries (`react-markdown`, `html2pdf`) into distinct chunks
+3. **Image Optimization**:
+   - `loading="lazy"` on all below-the-fold images
+   - `decoding="async"` to avoid blocking the main thread
+   - `aspect-ratio` on image containers to prevent Cumulative Layout Shift (CLS)
+4. **CSS Optimization**: Production builds use Lightning CSS minification
+5. **Bundle Monitoring**: Keep production JS bundles under 200KB gzipped per route where possible
+
+## Offline and PWA Policy
+
+### Objective
+Provide a progressively enhanced experience that works under limited or intermittent connectivity, common in rural deployment areas.
+
+### Requirements
+1. **Local-First Storage**: All user data persists in `localStorage` — no server-side database dependency for core functionality
+2. **AI Provider Fallback**: Automatic failover from Ollama (local) → OpenRouter (cloud) → QVAC (cloud) so AI features remain available if any provider is unreachable
+3. **Service Worker Readiness**: Manifest with proper icons, `display: standalone`, and `orientation: portrait-primary` is configured for future service worker installation
+4. **Graceful Degradation**: Core read operations must work without network connectivity when data is cached locally
+
+## Device Compatibility Policy
+
+### Objective
+Ensure the platform functions correctly across the full range of devices used in target communities.
+
+### Target Device Tiers
+| Tier   | Examples                                  | Optimizations Required            |
+|--------|-------------------------------------------|-----------------------------------|
+| Tier 1 | Modern smartphones (2021+)                | Full experience, all features     |
+| Tier 2 | Mid-range Android (2018-2021)             | Responsive layouts, touch targets |
+| Tier 3 | Budget/older devices, Raspberry Pi 5      | Reduced animations, minified JS   |
+| Tier 4 | Print, screen readers, text-based browsers| Semantic HTML, print styles       |
+
+### Testing Requirements
+- Test on at least one device from each tier before release
+- Verify touch targets meet 44×44px minimum on actual touch devices
+- Test with system-level "Reduce Motion" enabled
+- Verify dark mode renders correctly
+- Print preview must show usable content without navigation chrome
+
+---
 
 - **Financial Management**: Budget allocation, grant management, revenue generation, audit and compliance
 - **Governance**: Board management, executive leadership, risk management, compliance and ethics

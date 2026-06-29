@@ -85,11 +85,16 @@ const WalletIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" /></svg>
 );
 
+const LegalIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>
+);
+
 const moreNav: { labelKey: string; page: Page; Icon: React.ElementType }[] = [
   { labelKey: 'nav.wallet', page: 'wallet', Icon: WalletIcon },
   { labelKey: 'nav.zanzibar', page: 'zanzibar', Icon: ZanzibarIcon },
   { labelKey: 'nav.chat', page: 'chat', Icon: ChatBubbleIcon },
   { labelKey: 'nav.locker', page: 'locker', Icon: LockerIcon },
+  { labelKey: 'nav.legal', page: 'legal', Icon: LegalIcon },
 ];
 
 const AiIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -158,6 +163,9 @@ export const Header: React.FC<HeaderProps> = ({ activePage, setActivePage }) => 
         break;
       case 'wallet':
         import('./CarbonWallet').catch(p);
+        break;
+      case 'legal':
+        import('./LegalWiki').catch(p);
         break;
       default:
         break;

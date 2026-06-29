@@ -12,6 +12,7 @@ const CarbonMarket = React.lazy(() => import('./components/CarbonMarket').then(m
 const GovernancePortal = React.lazy(() => import('./components/GovernancePortal').then(m => ({ default: m.GovernancePortal })));
 const ZanzibarShowcase = React.lazy(() => import('./components/ZanzibarShowcase').then(m => ({ default: m.ZanzibarShowcase })));
 const CarbonWallet = React.lazy(() => import('./components/CarbonWallet').then(m => ({ default: m.CarbonWallet })));
+const LegalWiki = React.lazy(() => import('./components/LegalWiki').then(m => ({ default: m.LegalWiki })));
 import { Footer } from './components/Footer';
 import { Page } from './types';
 import { ToastsProvider } from './components/ToastsProvider';
@@ -30,6 +31,7 @@ const pageComponents: Record<Page, React.ComponentType<object>> = {
   governance: GovernancePortal,
   zanzibar: ZanzibarShowcase,
   wallet: CarbonWallet,
+  legal: LegalWiki,
 };
 
 function getPageFromHash(): Page {

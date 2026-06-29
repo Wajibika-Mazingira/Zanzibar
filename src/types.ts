@@ -1,4 +1,31 @@
-export type Page = 'assessment' | 'chat' | 'locker' | 'carbon' | 'market' | 'governance' | 'zanzibar' | 'passport' | 'wallet';
+export type Page = 'assessment' | 'chat' | 'locker' | 'carbon' | 'market' | 'governance' | 'zanzibar' | 'passport' | 'wallet' | 'legal';
+
+export type LegalCategory = 'environmental' | 'land' | 'water' | 'energy' | 'planning' | 'regulations';
+
+export interface LegalSection {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface LegalAct {
+  id: string;
+  title: string;
+  shortTitle: string;
+  year: number;
+  actNumber: string;
+  category: LegalCategory;
+  description: string;
+  jurisdiction: string;
+  status: 'in_force' | 'repealed' | 'amended';
+  dateEnacted: string;
+  dateCommenced?: string;
+  parts: { title: string; summary: string }[];
+  keyProvisions: { section: string; description: string; penalty?: string }[];
+  enforcingAgency: string;
+  relatedLaws: string[];
+  penalties?: string;
+}
 
 export type AssessmentType = 'Environmental' | 'Social' | 'Health' | 'Climate' | 'Cumulative' | 'Carbon_Sequestration' | 'Project_Monitoring' | 'Community_Engagement' | 'Compliance_Verification' | 'Financial_Analysis' | 'Risk_Assessment';
 

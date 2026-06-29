@@ -12,14 +12,29 @@ const app = express();
 
 // Helmet: sets various HTTP security headers
 app.use(helmet({
-  contentSecurityPolicy: false, // Handled by nginx
-  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // nginx handles COEP upstream
 }));
 
 // CORS: restrict to known origins in production; allow all in development
 const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').filter(Boolean);
+if (allowedOrigins.length === 0) {
+  console.warn('CORS_ORIGINS not set — CORS restricted to same origin');
+}
 app.use(cors({
-  origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
+  origin: allowedOrigins.length > 0 ? allowedOrigins : false,
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'X-Request-ID'],
   maxAge: 86400,

@@ -36,7 +36,7 @@ export const sanitizeUrl = (url: string): string | undefined => {
  */
 export const stripHtml = (html: string): string => {
   if (!html || typeof html !== 'string') return '';
-  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return html.replace(/<("[^"]*"|'[^']*'|[^>])*>/g, '').replace(/\s+/g, ' ').trim();
 };
 
 /** Maximum allowed file size for image uploads (10 MB). */

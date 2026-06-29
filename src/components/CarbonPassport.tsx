@@ -52,9 +52,10 @@ function generateBoundary(centerLat: number, centerLng: number): { latitude: num
     { lat: -0.01, lng: -0.01 },
     { lat: -0.01, lng: 0.01 },
   ];
+  const randomFloat = () => crypto.getRandomValues(new Uint32Array(1))[0] / 0xFFFFFFFF;
   return offsets.map(o => ({
-    latitude: Math.round((centerLat + o.lat + (Math.random() - 0.5) * 0.005) * 10000) / 10000,
-    longitude: Math.round((centerLng + o.lng + (Math.random() - 0.5) * 0.005) * 10000) / 10000,
+    latitude: Math.round((centerLat + o.lat + (randomFloat() - 0.5) * 0.005) * 10000) / 10000,
+    longitude: Math.round((centerLng + o.lng + (randomFloat() - 0.5) * 0.005) * 10000) / 10000,
   }));
 }
 
